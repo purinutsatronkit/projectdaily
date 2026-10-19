@@ -1,0 +1,12 @@
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+process.env.RUNTIME_NODE_MODULES='C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules';
+process.env.RUNTIME_NODE='C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe';
+process.env.RUNTIME_PYTHON='C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe';
+process.env.RUNTIME_BIN_DIR='C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override';
+const workspaceDir='C:/Users/User/Documents/ChatGPT/new Project website';
+const TMP=path.join(workspaceDir,'tmp/video-presentation/slides');
+const SKILL='C:/Users/User/.codex/plugins/cache/openai-primary-runtime/presentations/26.1015.12040/skills/presentations';
+const {finalizePresentation}=await import(pathToFileURL(path.join(SKILL,'container_tools/artifact_tool_utils.mjs')).href);
+const result=await finalizePresentation({workspaceDir,candidatePath:path.join(TMP,'candidate.pptx'),finalPath:path.join(workspaceDir,'artifacts/video-learning-presentation.pptx'),pythonExecutable:process.env.RUNTIME_PYTHON,integrityValidatorPath:path.join(SKILL,'container_tools/inspect_presentation_package_integrity.py'),layoutValidatorPath:path.join(SKILL,'container_tools/inspect_presentation_layout_geometry.py'),explicitTotalSlideCount:10,requiredNativeTableOwnerSlides:[7],requiredNativeChartOwnerSlides:[],layoutArgs:['--expected-slide-size-emu','12192000,6858000','--validate-bullet-geometry','--validate-heading-fit','--require-native-table-slide','7'],fontPolicy:{basis:'design',families:['Leelawadee UI']},verifyArtifactToolImport:true,receiptPath:path.join(TMP,'validation.json')});
+console.log(JSON.stringify(result,null,2));

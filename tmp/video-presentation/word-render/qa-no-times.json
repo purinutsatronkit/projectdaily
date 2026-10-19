@@ -1,0 +1,28 @@
+{
+  "file": "C:\\Users\\User\\Documents\\ChatGPT\\new Project website\\artifacts\\video-learning-report.docx",
+  "pages": 5,
+  "removedClipTimestamps": 36,
+  "removedClipDurations": 2,
+  "changedParagraphs": [
+    5,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    22,
+    26,
+    27,
+    28,
+    30,
+    33,
+    36
+  ],
+  "runAndParagraphFormatting": "preserved",
+  "tables": "unchanged",
+  "coreMetadata": "unchanged semantically",
+  "sourceMarkdown": "synchronized",
+  "visualQa": "all five final pages passed",
+  "summaryPage": 5
+}

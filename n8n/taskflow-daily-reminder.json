@@ -1,0 +1,209 @@
+{
+  "name": "TaskFlow - Daily due task email (07:30 Bangkok)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 7,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "taskflow-daily",
+      "name": "Daily 07:30 Bangkok",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3000/api/integrations/due-tasks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "taskflow-get",
+      "name": "Get due tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-due-tasks",
+              "leftValue": "={{ $json.tasks.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "taskflow-check",
+      "name": "Has due tasks?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "TaskFlow <your-smtp-address@example.com>",
+        "toEmail": "={{ $json.user.email }}",
+        "subject": "={{ 'TaskFlow: ' + $json.tasks.length + ' งานที่ต้องทำ — ' + $json.date }}",
+        "emailFormat": "text",
+        "text": "={{ 'สวัสดี ' + $json.user.name + '\\n\\nงานที่ครบกำหนดหรือเลยกำหนด ณ วันที่ ' + $json.date + '\\n\\n' + $json.tasks.map((task, index) => (index + 1) + '. ' + task.title + '\\n   กำหนดส่ง: ' + task.due_date + ' | ความสำคัญ: ' + task.priority + ' | สถานะ: ' + task.status).join('\\n\\n') + '\\n\\nเปิด TaskFlow เพื่ออัปเดตสถานะงาน\\nhttp://localhost:5173\\n\\nอีเมลนี้เป็นการเตือนรายวันจาก workflow ของคุณ' }}",
+        "options": {
+          "appendAttribution": false,
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "taskflow-email",
+      "name": "Send task summary",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        160
+      ],
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/integrations/reminders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ task_ids: $('Get due tasks').first().json.tasks.map(task => task.id), date: $('Get due tasks').first().json.date, channel: 'email' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "taskflow-record",
+      "name": "Record sent reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        160
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "content": "## ตั้งค่าก่อนเปิดใช้งาน\n1. เลือก Header Auth credential ใน HTTP Request ทั้งสอง node: Name = x-api-key, Value = API key ของผู้ใช้ TaskFlow\n2. เลือก SMTP credential และเปลี่ยน From Email เป็นที่อยู่จริง\n3. n8n บนเครื่อง: ใช้ localhost | n8n ใน Docker: เปลี่ยน URL ทั้งสองเป็น host.docker.internal และตั้ง API HOST=0.0.0.0 เฉพาะเมื่อจำเป็น\n4. Workflow settings: Asia/Bangkok (ตั้งไว้แล้ว)\n5. ทดสอบก่อน Publish/Activate; การทดสอบเต็ม flow จะส่งอีเมลจริง\n\nAPI key/SMTP secret ไม่อยู่ในไฟล์นี้\nไม่มี task → ไม่ส่งเมล\nSMTP fail → ไม่บันทึก reminder\nSMTP accepted ไม่ได้ยืนยันว่าเข้ากล่องผู้รับ\nถ้าส่งสำเร็จแต่บันทึกล้มเหลว อาจส่งซ้ำในการรันถัดไป",
+        "height": 430,
+        "width": 620,
+        "color": 5
+      },
+      "id": "taskflow-note",
+      "name": "Setup and limitations",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        -270
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 07:30 Bangkok": {
+      "main": [
+        [
+          {
+            "node": "Get due tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get due tasks": {
+      "main": [
+        [
+          {
+            "node": "Has due tasks?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has due tasks?": {
+      "main": [
+        [
+          {
+            "node": "Send task summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send task summary": {
+      "main": [
+        [
+          {
+            "node": "Record sent reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Bangkok"
+  },
+  "pinData": {},
+  "tags": []
+}

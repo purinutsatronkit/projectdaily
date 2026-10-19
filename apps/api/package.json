@@ -1,0 +1,12 @@
+{
+  "name": "@taskflow/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/server.ts"
+  },
+  "dependencies": {
+    "@taskflow/shared": "*",
+    "nodemailer": "^10.1.1"
+  }
+}

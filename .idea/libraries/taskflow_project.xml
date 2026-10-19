@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="taskflow-project">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/artifacts/taskflow-project.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -1,0 +1,329 @@
+{
+  "schemaVersion": "presentation-validated-before-copy.v1",
+  "claimBoundary": "Read-only validation of the candidate completed. The bundled finalizer was not executed because automatic approval review was at capacity; no finalizer publication status is claimed.",
+  "candidatePath": "C:\\Users\\User\\Documents\\ChatGPT\\new Project website\\tmp\\video-presentation\\v2\\slides\\candidate.pptx",
+  "sha256": "7bc173f6c30cb9154fb3737ca534faf8c2d6790f67bdb28367500fe0ee1b2965",
+  "byteCount": 1457617,
+  "packageIntegrity": {
+    "exitCode": 0,
+    "chart_count": 0,
+    "claim_boundary": "Structural package checks only; no slide text, notes, formulas, chart values, or native PowerPoint execution were inspected.",
+    "finding_count": 0,
+    "findings": [],
+    "notes_parts_skipped": 16,
+    "relationship_part_count": 42,
+    "slide_count": 16,
+    "status": "pass"
+  },
+  "presentationLayout": {
+    "exitCode": 0,
+    "finding_count": 0,
+    "findings": [],
+    "font_policy": {
+      "checked_text_script_count": 359,
+      "native_font_rendering_verified": false,
+      "observed_font_families": [
+        "Leelawadee UI"
+      ],
+      "observed_font_use_counts": {
+        "Leelawadee UI": 359
+      },
+      "passed": true,
+      "performed": true
+    },
+    "slide_count": 16,
+    "slide_size_in": [
+      13.3333,
+      7.5
+    ],
+    "warning_count": 0,
+    "warnings": []
+  },
+  "nativeChartTitles": {
+    "exitCode": 0,
+    "checks": [],
+    "finding_count": 0,
+    "findings": [],
+    "native_chart_count": 0,
+    "native_powerpoint_verified": false,
+    "passed": true,
+    "presentation_sha256": "7bc173f6c30cb9154fb3737ca534faf8c2d6790f67bdb28367500fe0ee1b2965",
+    "schema_version": "presentation-native-chart-titles.v1",
+    "slide_count": 16,
+    "source_text_emitted": false,
+    "unresolved_linked_title_count": 0
+  },
+  "nativeTableArithmetic": {
+    "exitCode": 0,
+    "checked_column_count": 0,
+    "checks": [],
+    "claim_boundary": "Displayed-value arithmetic with rounding tolerance; not source-data verification.",
+    "eligible_table_count": 0,
+    "finding_count": 0,
+    "findings": [],
+    "native_table_count": 2,
+    "passed": true,
+    "schema_version": "presentation-native-table-arithmetic.v1",
+    "skipped_tables": [
+      {
+        "reason": "no_numeric_amounts",
+        "slide": 13,
+        "table": 1
+      },
+      {
+        "reason": "no_numeric_amounts",
+        "slide": 15,
+        "table": 1
+      }
+    ],
+    "slide_count": 16,
+    "warning_count": 0,
+    "warnings": []
+  },
+  "nativeChartDiscovery": {
+    "exitCode": 0,
+    "chart_count": 0,
+    "chart_counts": {},
+    "chart_owner_slide_parts": {},
+    "chart_owner_slides": [],
+    "package_sha256": "7bc173f6c30cb9154fb3737ca534faf8c2d6790f67bdb28367500fe0ee1b2965",
+    "schema_version": "owner-private.actual-native-chart-discovery.v1",
+    "slide_count": 16,
+    "source_attachments_accessed": false,
+    "source_required_chart_owners_inferred": false
+  },
+  "firstPartyImport": {
+    "performed": true,
+    "passed": true,
+    "slideCount": 16,
+    "sha256": "7bc173f6c30cb9154fb3737ca534faf8c2d6790f67bdb28367500fe0ee1b2965"
+  },
+  "notesAndEditability": {
+    "candidate": "C:\\Users\\User\\Documents\\ChatGPT\\new Project website\\tmp\\video-presentation\\v2\\slides\\candidate.pptx",
+    "sha256": "7bc173f6c30cb9154fb3737ca534faf8c2d6790f67bdb28367500fe0ee1b2965",
+    "byteCount": 1457617,
+    "slideCount": 16,
+    "scriptCount": 16,
+    "allNotesPass": true,
+    "notesChecks": [
+      {
+        "slide": 1,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 2,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 3,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 4,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 5,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 6,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 7,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 8,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 9,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 10,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 11,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 12,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 13,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 14,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 15,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      },
+      {
+        "slide": 16,
+        "scriptComplete": true,
+        "headerCorrect": true,
+        "scopePresent": true,
+        "sourcesPresent": true
+      }
+    ],
+    "objects": [
+      {
+        "slide": 1,
+        "nativeConnectors": 0,
+        "anchoredEndpoints": 0,
+        "nativeTables": 0
+      },
+      {
+        "slide": 2,
+        "nativeConnectors": 0,
+        "anchoredEndpoints": 0,
+        "nativeTables": 0
+      },
+      {
+        "slide": 3,
+        "nativeConnectors": 9,
+        "anchoredEndpoints": 18,
+        "nativeTables": 0
+      },
+      {
+        "slide": 4,
+        "nativeConnectors": 3,
+        "anchoredEndpoints": 6,
+        "nativeTables": 0
+      },
+      {
+        "slide": 5,
+        "nativeConnectors": 5,
+        "anchoredEndpoints": 10,
+        "nativeTables": 0
+      },
+      {
+        "slide": 6,
+        "nativeConnectors": 11,
+        "anchoredEndpoints": 22,
+        "nativeTables": 0
+      },
+      {
+        "slide": 7,
+        "nativeConnectors": 12,
+        "anchoredEndpoints": 24,
+        "nativeTables": 0
+      },
+      {
+        "slide": 8,
+        "nativeConnectors": 6,
+        "anchoredEndpoints": 12,
+        "nativeTables": 0
+      },
+      {
+        "slide": 9,
+        "nativeConnectors": 3,
+        "anchoredEndpoints": 6,
+        "nativeTables": 0
+      },
+      {
+        "slide": 10,
+        "nativeConnectors": 4,
+        "anchoredEndpoints": 8,
+        "nativeTables": 0
+      },
+      {
+        "slide": 11,
+        "nativeConnectors": 5,
+        "anchoredEndpoints": 10,
+        "nativeTables": 0
+      },
+      {
+        "slide": 12,
+        "nativeConnectors": 5,
+        "anchoredEndpoints": 10,
+        "nativeTables": 0
+      },
+      {
+        "slide": 13,
+        "nativeConnectors": 0,
+        "anchoredEndpoints": 0,
+        "nativeTables": 1
+      },
+      {
+        "slide": 14,
+        "nativeConnectors": 22,
+        "anchoredEndpoints": 44,
+        "nativeTables": 0
+      },
+      {
+        "slide": 15,
+        "nativeConnectors": 0,
+        "anchoredEndpoints": 0,
+        "nativeTables": 1
+      },
+      {
+        "slide": 16,
+        "nativeConnectors": 2,
+        "anchoredEndpoints": 4,
+        "nativeTables": 0
+      }
+    ],
+    "connectorCount": 87,
+    "anchoredEndpointCount": 174,
+    "nativeTableOwnerSlides": [
+      13,
+      15
+    ],
+    "passed": true
+  },
+  "passed": true
+}

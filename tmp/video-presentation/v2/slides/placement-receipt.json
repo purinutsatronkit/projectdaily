@@ -1,0 +1,9 @@
+{
+  "source": "C:/Users/User/Documents/ChatGPT/new Project website/tmp/video-presentation/v2/slides/candidate.pptx",
+  "final": "C:/Users/User/Documents/ChatGPT/new Project website/artifacts/video-learning-presentation-detailed.pptx",
+  "method": "regular file copy within workspace",
+  "sha256": "7bc173f6c30cb9154fb3737ca534faf8c2d6790f67bdb28367500fe0ee1b2965",
+  "bytes": 1457617,
+  "validation": "validated-before-copy.json",
+  "hashMatch": true
+}

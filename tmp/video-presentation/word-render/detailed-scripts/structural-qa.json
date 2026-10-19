@@ -1,0 +1,12 @@
+{
+  "file": "C:\\Users\\User\\Documents\\ChatGPT\\new Project website\\artifacts\\video-learning-speaking-scripts-detailed.docx",
+  "slides": 16,
+  "slideDurationSeconds": 970,
+  "slideDuration": "16 นาที 10 วินาที",
+  "reportSpeech": "included unchanged",
+  "sourceJSON": "all 16 spoken scripts preserved",
+  "excluded": "sources, sourceScope, onSlide and diagram drawing instructions",
+  "headingsAndTiming": "kept with first speech paragraph",
+  "bytes": 46991,
+  "sha256": "3b476765d4603fc8135ad1b16c7edcdc1e9d4b15d09662ce3ac10e15dc836e31"
+}
