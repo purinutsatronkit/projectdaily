@@ -11,7 +11,7 @@
 1. “TaskFlow เป็นเว็บงานส่วนตัว แต่ละงานมีเจ้าของหนึ่งคน Backend ตรวจเจ้าของจาก session ทุกครั้ง”
 2. “เว็บใช้ JWT ใน cookie สำหรับผู้ใช้ ส่วน n8n ใช้ API key ที่อ่านงานเตือนเฉพาะเจ้าของ key”
 3. “เก็บ web/api/shared ใน monorepo เพื่อใช้กติกาข้อมูลร่วมกัน แต่ข้อมูลจาก HTTP ยังต้องตรวจตอน API ทำงาน”
-4. “ลืมรหัสผ่านใช้ token สุ่มอายุ 15 นาที ไม่ใช้ JWT หรือ API key แทน เมื่อใช้สำเร็จจะเปลี่ยน password hash และยกเลิก session เดิมทั้งหมด”
+4. “ลืมรหัสผ่านใช้ token สุ่มอายุ 5 นาที ไม่ใช้ JWT หรือ API key แทน เมื่อใช้สำเร็จจะเปลี่ยน password hash และยกเลิก session เดิมทั้งหมด”
 
 ถ้าศัพท์ใดยังอธิบายไม่ได้ ให้ดู [glossary](./glossary.md) แล้วโยงกลับมาที่ปุ่ม/route/ตารางจริง หลีกเลี่ยงเพิ่มศัพท์ในสไลด์เพียงเพื่อให้งานดูซับซ้อน
 
@@ -38,7 +38,7 @@
 | 1:45–3:30 | Login แล้วเพิ่ม/แก้/ค้นหางาน | “ข้อมูลผ่าน validation และบันทึกจริง PATCH เปลี่ยนเฉพาะ field ที่ส่ง” |
 | 3:30–4:45 | `tasks.ts` และ SQL | “ID เลือกงาน user_id จาก session ตรวจเจ้าของ Prepared parameters แยกค่าจากคำสั่ง SQL” |
 | 4:45–6:00 | Diagram login/session | “scrypt ตรวจรหัสผ่าน JWT ตรวจลายเซ็นและวันหมดอายุ SQL session ทำให้เพิกถอนได้” |
-| 6:00–8:45 | หน้าลืมรหัสผ่านและ diagram reset | “ส่งลิงก์ทาง Gmail SMTP token สุ่ม 15 นาทีใช้ครั้งเดียว เปลี่ยน hash และยกเลิก session ใน transaction แล้ว login ใหม่” |
+| 6:00–8:45 | หน้าลืมรหัสผ่านและ diagram reset | “ส่งลิงก์ทาง Gmail SMTP token สุ่ม 5 นาทีใช้ครั้งเดียว เปลี่ยน hash และยกเลิก session ใน transaction แล้ว login ใหม่” |
 | 8:45–10:00 | หน้า API key และ n8n | “API key สำหรับเตือนงานแยกจาก reset token และ SMTP ของ password reset ไม่ต้องผ่าน n8n” |
 | 10:00–11:15 | หลักฐานและข้อจำกัด | “54 tests ผ่าน รวม SMTP ในเครื่อง ยังไม่มีหลักฐาน Gmail ถึง inbox และ n8n ตรวจแบบ static” |
 | 11:15–14:00 | ลบข้อมูลเดโม/ยกเลิก key/logout และถามตอบ | “ชี้ route หรือ test ที่รองรับคำตอบ ไม่แสดง secret และไม่อ้างผลที่ยังไม่ได้ตรวจ” |
@@ -70,7 +70,7 @@ sequenceDiagram
     A->>D: อ่าน scrypt hash
     A->>A: ตรวจ password
     A->>D: สร้าง auth_sessions
-    A-->>W: JWT ใน HttpOnly cookie (30 นาที)
+    A-->>W: JWT ใน HttpOnly cookie (5 ชั่วโมง)
     W->>A: ขอข้อมูลพร้อม cookie
     A->>A: ตรวจ signature / issuer / audience / exp
     A->>D: ตรวจ session และอ่านผู้ใช้
@@ -91,7 +91,7 @@ sequenceDiagram
     participant D as SQLite
     participant M as Gmail SMTP
     W->>A: POST /auth/forgot-password {email}
-    A->>D: เก็บ SHA-256 ของ token สุ่มและ expiry 15 นาที
+    A->>D: เก็บ SHA-256 ของ token สุ่มและ expiry 5 นาที
     A-->>W: 202 ข้อความกลาง ไม่เปิดเผยว่ามีบัญชีหรือไม่
     A->>M: ส่งลิงก์ reset แบบ async
     M-->>W: อีเมลพร้อม /reset-password#token=...
@@ -166,7 +166,7 @@ API ใช้ `Asia/Bangkok` ผ่าน `bangkokDate()` วันครบก�
 
 ### 11. Logout แค่ลบ cookie เพียงพอหรือไม่?
 
-ไม่พอสำหรับ token ที่ถูกคัดลอกไปแล้ว งานนี้ตั้ง `auth_sessions.revoked_at` ใน SQL แล้วลบ cookie Request ถัดไปตรวจ session ทุกครั้ง จึงปฏิเสธ token เดิม แม้ JWT ยังไม่ครบ 30 นาที รุ่นนี้ไม่มี refresh token ผู้ใช้ login ใหม่เมื่อหมดอายุ
+ไม่พอสำหรับ token ที่ถูกคัดลอกไปแล้ว งานนี้ตั้ง `auth_sessions.revoked_at` ใน SQL แล้วลบ cookie Request ถัดไปตรวจ session ทุกครั้ง จึงปฏิเสธ token เดิม แม้ JWT ยังไม่ครบ 5 ชั่วโมง รุ่นนี้ไม่มี refresh token ผู้ใช้ login ใหม่เมื่อหมดอายุ
 
 ### 12. ทำไมเลือก SQLite และมีข้อจำกัดอะไร?
 
@@ -186,7 +186,7 @@ GET ไม่นำงานที่มี receipt ของวันเดี�
 
 ### 16. ทำไม reset token แยกจาก JWT และ API key?
 
-JWT ใช้กับ session หน้าเว็บอายุ 30 นาที API key ใช้ integration scope reminders อายุ 30 วัน ส่วน reset token ให้สิทธิ์เปลี่ยนรหัสผ่านเพียงครั้งเดียวใน 15 นาที จึงแยก endpoint, ตารางและการตรวจ ไม่รับ JWT หรือ API key แทน reset token ลิงก์ส่งถึงอีเมลที่ผูกกับบัญชี และไม่มี token ฉบับเต็มใน SQL
+JWT ใช้กับ session หน้าเว็บอายุ 5 ชั่วโมง API key ใช้ integration scope reminders อายุ 30 วัน ส่วน reset token ให้สิทธิ์เปลี่ยนรหัสผ่านเพียงครั้งเดียวใน 5 นาที จึงแยก endpoint, ตารางและการตรวจ ไม่รับ JWT หรือ API key แทน reset token ลิงก์ส่งถึงอีเมลที่ผูกกับบัญชี และไม่มี token ฉบับเต็มใน SQL
 
 ### 17. ถ้ามีคนกดลิงก์เดียวกันพร้อมกันสองครั้งจะเกิดอะไร?
 
@@ -222,6 +222,6 @@ Tests ผ่านเป็นหลักฐานของพฤติกร�
 
 คลิป API/Auth อ่านคำบรรยายอังกฤษอัตโนมัติครบตั้งแต่ 00:00–01:44:21 และศึกษา repo ของผู้สอน คำบรรยายอาจถอดศัพท์ผิด ส่วนคลิป Monorepo ไม่มี transcript ให้ export จึงใช้หน้าอธิบาย รายการบท และ repo ที่ผู้สอนเชื่อมโดยตรง การศึกษานี้ไม่อ้างว่าดูภาพ/ฟังเสียงครบทั้งสองคลิป รายละเอียดและ URL อยู่ใน [video-study](./video-study.md)
 
-อธิบายให้ชัดว่า TaskFlow ใช้แนวคิดจากคลิปและเลือก implementation ตามขอบเขตงาน เช่น npm แทน pnpm, SQLite แทน PostgreSQL, JWT cookie พร้อม SQL session 30 นาทีแทนตัวอย่าง Bearer token 5 นาที และเพิ่ม n8n เอง ผู้ฟังจึงแยกได้ว่าส่วนใดมาจากบทเรียนและส่วนใดเราตัดสินใจ
+อธิบายให้ชัดว่า TaskFlow ใช้แนวคิดจากคลิปและเลือก implementation ตามขอบเขตงาน เช่น npm แทน pnpm, SQLite แทน PostgreSQL, JWT cookie พร้อม SQL session 5 ชั่วโมงแทนตัวอย่าง Bearer token 5 นาที และเพิ่ม n8n เอง ผู้ฟังจึงแยกได้ว่าส่วนใดมาจากบทเรียนและส่วนใดเราตัดสินใจ
 
 ถ้าถูกถามเรื่องที่ยังไม่ทำ ให้ตอบสั้น ๆ ว่า “รุ่นนี้ยังไม่มีส่วนนั้น ขอบเขตที่ทดสอบแล้วคือ… ถ้าจะเพิ่มต้องออกแบบ…ก่อน” แล้วชี้ข้อจำกัดที่บันทึกไว้ ไม่จำเป็นต้องตอบด้วยศัพท์ใหม่ที่ยังไม่เข้าใจ

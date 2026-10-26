@@ -10,7 +10,7 @@
 | Middleware | โค้ดกลางที่ทำก่อน/หลัง handler และส่งต่อด้วย `next()` | Request ID, body limit, Origin check, authentication | “Request ต้องผ่านด่านใดก่อนถึง SQL?” |
 | Authentication | พิสูจน์ว่าใครเป็นผู้เรียก | ตรวจ JWT/session ของ browser หรือ key ของ n8n | “ผู้เรียกคนนี้เป็นใคร?” |
 | Authorization / Ownership | ตัดสินว่าผู้เรียกทำสิ่งนั้นได้หรือไม่; ownership คือเจ้าของข้อมูล | `WHERE id=? AND user_id=?`; integration จำกัดเจ้าของ key | “Login แล้วแก้งานคนอื่นได้ไหม?” — ไม่ได้ |
-| JWT / Claims | Token บรรจุข้อมูลยืนยัน เช่น `sub`, `sid`, `exp`; แบบ signed มีลายเซ็นตรวจการแก้ไข | `security.ts` ใช้ jose ออก/ตรวจ JWT 30 นาที | “Payload เป็นความลับหรือไม่?” — แบบ signed นี้อ่านได้ |
+| JWT / Claims | Token บรรจุข้อมูลยืนยัน เช่น `sub`, `sid`, `exp`; แบบ signed มีลายเซ็นตรวจการแก้ไข | `security.ts` ใช้ jose ออก/ตรวจ JWT 5 ชั่วโมง | “Payload เป็นความลับหรือไม่?” — แบบ signed นี้อ่านได้ |
 | Signature / Verify | Signature ผูกข้อมูลกับ signing key; verify ตรวจลายเซ็นและ policy ก่อนเชื่อข้อมูล | HS256, issuer, audience, expiration | “Decode แล้วเชื่อได้ไหม?” — ยังไม่ได้ ต้อง verify |
 | Session / Revocation | ช่วงการเข้าสู่ระบบที่ backend ยอมรับ; revocation คือยกเลิกก่อนหมดอายุ | `auth_sessions`, `revoked_at`; logout เพิกถอนแล้วลบ cookie | “Token ที่คัดลอกก่อน logout ใช้ต่อได้ไหม?” — ไม่ผ่าน session check |
 | Cookie / HttpOnly / SameSite / Secure | Browser เก็บและส่ง cookie ตามเงื่อนไข; HttpOnly กัน JavaScript อ่านโดยตรง; SameSite จำกัดการส่งข้าม site; Secure ใช้กับ HTTPS | `taskflow_session` ใน browser | “Cookie ถูกส่งอัตโนมัติแล้วต้องตรวจอะไรเพิ่ม?” — สิทธิ์และต้นทางของ mutation |

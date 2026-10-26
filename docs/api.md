@@ -1,6 +1,30 @@
 # TaskFlow API
 
+## ร่าง สก.09
+
+`GET /sk09/draft` ใช้ session cookie คืน `{draft: null}` เมื่อยังไม่มีร่าง หรือ `{draft: {data,version,updated_at}}` เฉพาะบัญชีเจ้าของ
+
+`PUT /sk09/draft` รับ `{data,version}` โดย version เริ่ม 0 และใช้ค่าล่าสุดจาก GET/PUT ในครั้งถัดไป รับข้อมูลแบบฟอร์มที่ยังไม่ครบได้ แต่ตรวจชนิด ความยาว จำนวนวัน 5 แถว และรูปแบบวันที่/เวลา จำกัด body 64 KB เพื่อรองรับข้อความไทยเต็มทุกช่อง ใช้ Origin/session check; version เก่าที่ข้อมูลต่างกันคืน 409 `DRAFT_CONFLICT` ส่วนการลองส่งข้อมูลเดิมซ้ำหลัง response หายคืนร่างเดิม ไม่สร้างเวอร์ชันซ้ำ เก็บร่างล่าสุด 1 ฉบับต่อบัญชีใน SQLite
+
 Base URL สำหรับพัฒนา: `http://localhost:3000/api`
+
+`GET /notifications` ต้องใช้ session cookie คืน `{ today, through, tasks, count }` เฉพาะรายการยังไม่อ่าน แต่ละ task มี `notification_id` และ `notification_date` สร้าง snapshot หนึ่งรอบต่อบัญชี/วันเมื่อขอข้อมูลครั้งแรกตั้งแต่ 07:00 Asia/Bangkok เลือกงานยังไม่เสร็จที่มีวันส่งไม่เกินวันนี้ + 3 วัน รวมงานเลยกำหนด รอบใหม่แทนรอบเก่า งานเพิ่มหลังรอบวันนี้รอวันถัดไป และไม่ขึ้นกับประวัติอีเมล เก็บประวัติรอบย้อนหลังประมาณ 30 วัน
+
+`PATCH /notifications/:id/read` ทำเครื่องหมายอ่านเฉพาะรายการของเจ้าของ session (idempotent) คืน 204, รายการไม่มี/ต่างเจ้าของคืน 404 ส่วน `POST /notifications/read-all` อ่านทั้งหมดเฉพาะบัญชีตนเอง คืน 204 ทั้งสอง endpoint ตรวจ Origin และไม่เปลี่ยนสถานะงาน
+
+`GET /tasks` เรียงงานที่ยังไม่เสร็จก่อน ตามวันส่งเก่าไปใหม่ วันที่เดียวกันเรียงความสำคัญสูง → ปกติ → ต่ำ งานไม่มีวันส่งอยู่หลังงานที่มีวันส่ง และงานเสร็จแล้วอยู่ท้ายรายการ
+
+## Account settings
+
+ต้องใช้ session cookie และผ่านการตรวจ Origin ทุก mutation:
+
+- `GET /account` คืน `{ user }` มี `id`, `name`, `email`, `nickname`, `phone`, `avatar_url`
+- `PATCH /account` ส่ง JSON `{ name, nickname, phone, email, current_password? }` ชื่อ 2–80 ตัว ชื่อเล่นไม่เกิน 40 ตัว เบอร์โทรไม่เกิน 30 ตัว (เว้นว่างเพื่อล้างได้) การเปลี่ยนอีเมลต้องยืนยันรหัสผ่านปัจจุบัน และจะเปลี่ยนจริงเมื่อกดลิงก์ยืนยันที่ส่งไปยังอีเมลใหม่ อีเมลซ้ำคืน 409
+- `PUT /account/avatar` ส่ง bytes ของภาพโดยตรงพร้อม `Content-Type: image/png`, `image/jpeg`, `image/gif` หรือ `image/webp` จำกัด 2 MB และตรวจ signature ของไฟล์ คืน `{ user }`
+- `GET /account/avatar` คืนรูปของผู้ใช้ที่ login เท่านั้น พร้อม `Cache-Control: no-store`
+- `DELETE /account/avatar` ลบรูปของเจ้าของ session แล้วคืน `{ user }`
+
+ไฟล์ภาพเก็บใน SQLite การนำเข้าจากลิงก์ทำใน browser ตรวจชนิดและขนาดก่อนส่ง bytes มายัง API จึงต้องใช้ลิงก์ที่รองรับ CORS ไม่มีการให้ server ดึง URL ภายนอก
 
 ## Authentication
 
@@ -58,7 +82,7 @@ Mutation ใช้ `Content-Type: application/json` และ backend ปฏิ�
 { "token": "<token 64 ตัวจากลิงก์อีเมล>", "password": "A-new-password!2026" }
 ```
 
-ตัวอย่าง token เป็น placeholder ต้องใช้ token จริงรูปแบบ hexadecimal 64 ตัว ลิงก์มีอายุ **15 นาที** และใช้ได้ครั้งเดียว รหัสใหม่ยาว **12–128 ตัวอักษร** ช่องยืนยันรหัสผ่านตรวจที่หน้าเว็บจึงไม่ส่งมาใน body
+ตัวอย่าง token เป็น placeholder ต้องใช้ token จริงรูปแบบ hexadecimal 64 ตัว ลิงก์มีอายุ **5 นาที** และใช้ได้ครั้งเดียว รหัสใหม่ยาว **8–16 ตัวอักษร** ช่องยืนยันรหัสผ่านตรวจที่หน้าเว็บจึงไม่ส่งมาใน body
 
 สำเร็จตอบ **200**:
 

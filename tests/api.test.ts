@@ -6,9 +6,10 @@ import { createApp } from '../apps/api/src/app.ts';
 import { openDatabase } from '../apps/api/src/db.ts';
 import { bangkokDate, type Config } from '../apps/api/src/context.ts';
 import { checkPassword, hashApiKey } from '../apps/api/src/security.ts';
+import { readNotifications } from '../apps/api/src/notifications.ts';
 
 const SECRET = 'taskflow-test-secret-with-at-least-32-characters';
-const PASSWORD = 'Demo-only-password-42!';
+const PASSWORD = 'Demo-pass-42!';
 const ORIGIN = 'http://localhost:5173';
 interface Identity { cookie: string; user: { id: string; name: string; email: string } }
 interface Task { id: string; title: string; description: string; priority: string; status: string; due_date: string | null }
@@ -64,10 +65,70 @@ const shiftedDate = (days: number) => {
   return date.toISOString().slice(0, 10);
 };
 
+test('production rejects the shared demo account, existing sessions and integration keys',async t=>{
+  const f=fixture(t),demo=await f.register('demo@taskflow.local'),key=await f.key(demo);
+  const production=createApp(f.db,{secret:SECRET,origins:[ORIGIN],production:true,silent:true});
+  const credentials={name:'Demo',email:'demo@taskflow.local',password:PASSWORD};
+  for(const [path,status] of [['login',401],['register',400]] as const) {
+    assert.equal((await production.request(`/api/auth/${path}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(credentials)})).status,status);
+  }
+  assert.equal((await production.request('/api/sk09/draft',{headers:{cookie:demo.cookie}})).status,401);
+  assert.equal((await production.request('/api/integrations/due-tasks',{headers:{'x-api-key':key.secret}})).status,401);
+  assert.equal((await f.request('/api/auth/me',{cookie:demo.cookie})).status,200);
+});
+
+test('registration accepts 8 and 16 characters and rejects passwords outside that range', async t => {
+  const f = fixture(t);
+  for (const length of [7, 8, 16, 17]) {
+    const response = await f.request('/api/auth/register', { method: 'POST', body: {
+      name: 'Boundary tester', email: `length${length}@example.com`, password: 'a'.repeat(length),
+    } });
+    assert.equal(response.status, length === 8 || length === 16 ? 201 : 400);
+  }
+});
+
+test('tasks sort unfinished work by due date then priority with undated and completed work last',async t=>{
+  const f=fixture(t), owner=await f.register();
+  const specs: Partial<Task>[]=[
+    {title:'No date low',priority:'low'},
+    {title:'Tomorrow high',due_date:shiftedDate(1),priority:'high'},
+    {title:'Today low',due_date:shiftedDate(0),priority:'low'},
+    {title:'Today medium',due_date:shiftedDate(0),priority:'medium'},
+    {title:'Today high',due_date:shiftedDate(0),priority:'high'},
+    {title:'Overdue low',due_date:shiftedDate(-2),priority:'low'},
+    {title:'Completed old',due_date:shiftedDate(-5),status:'completed',priority:'high'},
+    {title:'No date high',priority:'high'},
+  ];
+  for(const spec of specs) await f.task(owner,spec);
+  const data=await (await f.request('/api/tasks',{cookie:owner.cookie})).json();
+  assert.deepEqual(data.tasks.map((task:Task)=>task.title),['Overdue low','Today high','Today medium','Today low','Tomorrow high','No date high','No date low','Completed old']);
+});
+
+test('in-app notifications include overdue and the next three Bangkok days, scoped to owner and independent of email receipts',async t=>{
+  const f=fixture(t), owner=await f.register(), other=await f.register('other@example.com');
+  const overdue=await f.task(owner,{title:'Overdue task',due_date:shiftedDate(-1),priority:'low'});
+  await f.task(owner,{title:'Today high',due_date:shiftedDate(0),priority:'high'});
+  await f.task(owner,{title:'Three days',due_date:shiftedDate(3)});
+  await f.task(owner,{title:'Four days',due_date:shiftedDate(4)});
+  await f.task(owner,{title:'No deadline'});
+  await f.task(owner,{title:'Done today',due_date:shiftedDate(0),status:'completed'});
+  await f.task(other,{title:'Private other task',due_date:shiftedDate(0)});
+  f.db.prepare('INSERT INTO reminder_deliveries(id,user_id,task_id,notification_date,channel,created_at) VALUES(?,?,?,?,?,?)').run(randomUUID(),owner.user.id,overdue.id,shiftedDate(0),'email',new Date().toISOString());
+  assert.equal((await f.request('/api/notifications')).status,401);
+  readNotifications(f.db,owner.user.id,new Date(`${shiftedDate(0)}T07:00:00+07:00`));
+  const data=await (await f.request('/api/notifications',{cookie:owner.cookie})).json();
+  assert.equal(data.today,shiftedDate(0)); assert.equal(data.through,shiftedDate(3)); assert.equal(data.count,3);
+  assert.deepEqual(data.tasks.map((task:Task)=>task.title),['Overdue task','Today high','Three days']);
+  await f.request(`/api/tasks/${overdue.id}`,{method:'PATCH',cookie:owner.cookie,body:{status:'completed'}});
+  assert.equal((await (await f.request('/api/notifications',{cookie:owner.cookie})).json()).count,2);
+  await f.request(`/api/tasks/${overdue.id}`,{method:'PATCH',cookie:owner.cookie,body:{status:'pending',due_date:shiftedDate(5)}});
+  assert.equal((await (await f.request('/api/notifications',{cookie:owner.cookie})).json()).count,2);
+});
+
 test('registration normalizes email, trims name, hashes password, and returns only public fields', async t => {
   const f = fixture(t);
   const identity = await f.register('  OWNER@Example.COM  ', '  Owner  ');
-  assert.deepEqual(Object.keys(identity.user).sort(), ['email', 'id', 'name']);
+  assert.deepEqual(Object.keys(identity.user).sort(), ['avatar_url', 'email', 'email_verified_at', 'id', 'name', 'nickname', 'phone']);
   assert.equal(identity.user.email, 'owner@example.com');
   assert.equal(identity.user.name, 'Owner');
   const stored = f.db.prepare('SELECT email,password_hash FROM users WHERE id=?').get(identity.user.id) as { email: string; password_hash: string };
@@ -96,12 +157,16 @@ test('login uses HttpOnly SameSite session, serves public identity, and never re
   const cookie = response.headers.get('set-cookie')!;
   assert.match(cookie, /HttpOnly/i);
   assert.match(cookie, /SameSite=Lax/i);
-  assert.match(cookie, /Max-Age=1800/i);
+  assert.match(cookie, /Max-Age=18000/i);
+  const claims = decodeJwt(cookie.split(';')[0].split('=')[1]);
+  assert.equal(claims.exp! - claims.iat!, 5 * 60 * 60);
+  const session = f.db.prepare('SELECT created_at,expires_at FROM auth_sessions WHERE id=?').get(String(claims.sid)) as { created_at: string; expires_at: string };
+  assert.ok(Math.abs(Date.parse(session.expires_at) - Date.parse(session.created_at) - 5 * 60 * 60_000) < 1000);
   assert.match(cookie, /Path=\//i);
   assert.deepEqual(Object.keys(await response.json()), ['user']);
   const me = await f.request('/api/auth/me', { cookie: cookie.split(';')[0] });
   assert.equal(me.status, 200);
-  assert.deepEqual(Object.keys((await me.json()).user).sort(), ['email', 'id', 'name']);
+  assert.deepEqual(Object.keys((await me.json()).user).sort(), ['avatar_url', 'email', 'email_verified_at', 'id', 'name', 'nickname', 'phone']);
   assert.equal(me.headers.get('cache-control'), 'no-store');
 });
 
@@ -434,7 +499,7 @@ test('due integration includes today/overdue unfinished tasks only for its key o
   assert.equal(response.status, 200);
   const payload = await response.json();
   assert.equal(payload.date, bangkokDate());
-  assert.deepEqual(payload.user, first.user);
+  assert.deepEqual(payload.user, { id: first.user.id, name: first.user.name, email: first.user.email });
   assert.deepEqual(payload.tasks.map((task: Task) => task.id), [overdue.id, today.id]);
   assert.ok((f.db.prepare('SELECT last_used_at FROM api_keys WHERE id=?').get(issued.key.id) as { last_used_at: string }).last_used_at);
   await expectError(await f.request('/api/integrations/due-tasks?date=2026-02-30', { headers: { 'x-api-key': issued.secret } }), 400, 'INVALID_DATE');

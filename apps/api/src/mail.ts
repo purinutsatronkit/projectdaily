@@ -28,6 +28,10 @@ export function createResetEmailService(transport: Transporter, publicUrl: strin
       });
       if (!result.accepted?.length) throw new Error('SMTP_RECIPIENT_REJECTED');
     },
+    sendVerification:async({to,verifyUrl})=>{
+      const result=await transport.sendMail({from,to,subject:'ยืนยันอีเมลสำหรับ TaskFlow',text:`เปิดลิงก์นี้เพื่อยืนยันอีเมล TaskFlow ภายใน 15 นาที:\n${verifyUrl}\n\nหากไม่ได้ขอ ให้ละเว้นอีเมลนี้`,disableFileAccess:true,disableUrlAccess:true});
+      if(!result.accepted?.length)throw new Error('SMTP_RECIPIENT_REJECTED');
+    },
   };
 }
 
