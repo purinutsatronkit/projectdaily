@@ -37,7 +37,7 @@ export default function Sk09Form({draft,projectId}:{draft:Sk09DraftController;pr
   }
   function submit(event:FormEvent) {event.preventDefault();void generate(true);}
   return <div>
-    <div className="page-intro"><p className="eyebrow">Cooperative education</p><h1 className="page-title">บันทึกสหกิจศึกษา สก.09<span className="text-[#b6975e]">.</span></h1><p className="page-description">กรอกข้อมูลรายสัปดาห์ 5 วัน แล้วดาวน์โหลดเป็น PDF ตามแบบฟอร์ม</p></div>
+    <div className="page-intro"><p className="eyebrow">Cooperative education</p><h1 className="page-title">บันทึกสหกิจศึกษา สก.09<span className="text-[#a66a5f]">.</span></h1><p className="page-description">กรอกข้อมูลรายสัปดาห์ 5 วัน แล้วดาวน์โหลดเป็น PDF ตามแบบฟอร์ม</p></div>
     <div className="panel mt-6 flex flex-wrap items-center justify-between gap-4 p-5">
       <div><p role="status" className="text-sm font-medium text-teal-800">{!draft.ready?'กำลังโหลดร่าง':draft.saving?'กำลังบันทึกร่าง…':draft.dirty?'มีการแก้ไขที่ยังไม่บันทึก':draft.savedAt?`บันทึกร่างแล้ว · ${new Date(draft.savedAt).toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})}`:'เริ่มกรอกเพื่อบันทึกร่างอัตโนมัติ'}</p><p className="mt-1 text-xs leading-6 text-slate-500">เก็บร่างล่าสุด 1 ฉบับในบัญชีของคุณ กรอกไม่ครบก็เก็บไว้ได้ และเปิดต่อจากเครื่องอื่นได้</p>
       {draft.error&&<div role="alert" className="mt-2 text-sm text-red-700">{draft.error}<button type="button" className="ml-2 underline" disabled={draft.saving} onClick={()=>{if(!draft.dirty||window.confirm('โหลดร่างจากระบบแทนข้อความที่ยังไม่บันทึกในหน้านี้?')) {setPreview('');void draft.reload();}}}>โหลดร่างล่าสุด</button></div>}</div>
