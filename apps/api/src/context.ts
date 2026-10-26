@@ -6,11 +6,12 @@ export type Env = { Variables: { user: User; sessionId: string; requestId: strin
 export type AppContext = Context<Env>;
 export type Middleware = MiddlewareHandler<Env>;
 export interface PasswordResetMail { to: string; resetUrl: string; expiresMinutes: number }
-export interface PasswordResetConfig { publicUrl: string; send: (mail: PasswordResetMail) => Promise<void> }
+export interface PasswordResetConfig { publicUrl: string; send: (mail: PasswordResetMail) => Promise<void>; sendVerification?:(mail:{to:string;verifyUrl:string})=>Promise<void> }
 export interface Config {
   secret: string; origins: string[]; production?: boolean; silent?: boolean; authLimit?: number;
   resetRequestLimit?: number; resetSubmitLimit?: number;
   passwordReset?: PasswordResetConfig;
+  social?: import('./social-config.ts').SocialConfig;
   clientIp?: (c: AppContext) => string;
 }
 export class ApiError extends Error {

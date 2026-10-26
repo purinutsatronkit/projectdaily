@@ -19,7 +19,9 @@
     "start": "node --env-file-if-exists=.env --import tsx apps/api/src/server.ts",
     "setup": "node scripts/setup.mjs",
     "setup:email": "node scripts/setup-email.mjs",
-    "mail:check": "node --env-file-if-exists=.env --import tsx scripts/check-email.ts"
+    "mail:check": "node --env-file-if-exists=.env --import tsx scripts/check-email.ts",
+    "db:backup": "node --env-file-if-exists=.env scripts/backup-db.mjs",
+    "db:restore-check": "node scripts/restore-check.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.0",

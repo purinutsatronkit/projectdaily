@@ -6,8 +6,16 @@ import { hashPassword, checkPassword, issueToken, verifyToken } from './security
 import { ApiError, get, now, parseBody, type Config, type Env, type Middleware } from './context.ts';
 import type { Database } from './db.ts';
 import { passwordResetRoutes } from './password-reset.ts';
+import { readUser } from './account.ts';
+import {queueVerification} from './email-verification.ts';
 
 const COOKIE = 'taskflow_session';
+export async function startSession(db:Database,config:Config,c:Parameters<Middleware>[0],user:User) {
+  const id=randomUUID();
+  db.prepare('INSERT INTO auth_sessions(id,user_id,expires_at,created_at) VALUES(?,?,?,?)').run(id,user.id,new Date(Date.now()+5*60*60_000).toISOString(),now());
+  const token=await issueToken(user.id,id,config.secret);
+  setCookie(c,COOKIE,token,{httpOnly:true,secure:!!config.production,sameSite:'Lax',path:'/',maxAge:18000});
+}
 export function sessionMiddleware(db: Database, config: Config): Middleware {
   return async (c, next) => {
     const token = getCookie(c, COOKIE);
@@ -21,8 +29,8 @@ export function sessionMiddleware(db: Database, config: Config): Middleware {
       user = get<User>(db, `SELECT u.id,u.name,u.email FROM users u JOIN auth_sessions s ON s.user_id=u.id
         WHERE s.id=? AND u.id=? AND s.revoked_at IS NULL AND s.expires_at>?`, sid, payload.sub, now());
     } catch { throw new ApiError(401, 'SESSION_EXPIRED', 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง'); }
-    if (!user) throw new ApiError(401, 'SESSION_EXPIRED', 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง');
-    c.set('user', user); c.set('sessionId', sid!);
+    if (!user || (config.production && user.email === 'demo@taskflow.local')) throw new ApiError(401, 'SESSION_EXPIRED', 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง');
+    c.set('user', readUser(db,user.id)); c.set('sessionId', sid!);
     await next();
   };
 }
@@ -30,15 +38,9 @@ export function authRoutes(db: Database, config: Config) {
   const routes = new Hono<Env>();
   const authenticate = sessionMiddleware(db, config);
   routes.route('/', passwordResetRoutes(db, config));
-  async function startSession(c: Parameters<Middleware>[0], user: User) {
-    const id = randomUUID();
-    db.prepare('INSERT INTO auth_sessions(id,user_id,expires_at,created_at) VALUES(?,?,?,?)')
-      .run(id, user.id, new Date(Date.now() + 30 * 60_000).toISOString(), now());
-    const token = await issueToken(user.id, id, config.secret);
-    setCookie(c, COOKIE, token, { httpOnly: true, secure: !!config.production, sameSite: 'Lax', path: '/', maxAge: 1800 });
-  }
   routes.post('/register', async c => {
     const body = await parseBody(c, registerSchema);
+    if (config.production && body.email === 'demo@taskflow.local') throw new ApiError(400, 'DEMO_DISABLED', 'บัญชีตัวอย่างใช้ได้เฉพาะระบบพัฒนา');
     const user: User = { id: randomUUID(), name: body.name, email: body.email };
     const hash = await hashPassword(body.password);
     try { db.prepare('INSERT INTO users(id,name,email,password_hash,created_at) VALUES(?,?,?,?,?)').run(user.id,user.name,user.email,hash,now()); }
@@ -46,8 +48,9 @@ export function authRoutes(db: Database, config: Config) {
       if (String(error).includes('UNIQUE constraint')) throw new ApiError(409, 'EMAIL_EXISTS', 'อีเมลนี้มีบัญชีแล้ว');
       throw error;
     }
-    await startSession(c, user);
-    return c.json({ user }, 201);
+    await startSession(db, config, c, user);
+    if(config.passwordReset?.sendVerification&&user.email!=='demo@taskflow.local')queueVerification(db,config,user.id,user.email);
+    return c.json({ user: readUser(db,user.id) }, 201);
   });
   routes.post('/login', async c => {
     const body = await parseBody(c, loginSchema);
@@ -57,10 +60,10 @@ export function authRoutes(db: Database, config: Config) {
     const valid = await checkPassword(body.password, stored?.password_hash ?? fallbackHash);
     // A password reset can commit while scrypt runs. Never create a session from the old hash.
     const current = stored ? get<{ password_hash: string }>(db, 'SELECT password_hash FROM users WHERE id=?', stored.id) : undefined;
-    if (!stored || !valid || current?.password_hash !== stored.password_hash) throw new ApiError(401, 'INVALID_CREDENTIALS', 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    if (!stored || !valid || current?.password_hash !== stored.password_hash || (config.production && stored.email === 'demo@taskflow.local')) throw new ApiError(401, 'INVALID_CREDENTIALS', 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
     const { password_hash: _hash, ...user } = stored;
-    await startSession(c, user);
-    return c.json({ user });
+    await startSession(db, config, c, user);
+    return c.json({ user: readUser(db,user.id) });
   });
   routes.get('/me', authenticate, c => c.json({ user: c.get('user') }));
   routes.post('/logout', async c => {

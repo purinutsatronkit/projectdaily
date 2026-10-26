@@ -8,8 +8,8 @@ import type { Config } from '../apps/api/src/context.ts';
 import { checkPassword, hashPassword } from '../apps/api/src/security.ts';
 
 const SECRET = 'password-reset-test-secret-with-at-least-32-characters';
-const OLD_PASSWORD = 'Original-password-2026!';
-const NEW_PASSWORD = 'Replacement-password-2026!';
+const OLD_PASSWORD = 'Original-2026!';
+const NEW_PASSWORD = 'Replace-2026!';
 const ORIGIN = 'http://localhost:5173';
 interface Mail { to: string; resetUrl: string; expiresMinutes: number }
 interface Identity { cookie: string; user: { id: string; name: string; email: string } }
@@ -109,20 +109,20 @@ test('forgot-password does not enumerate accounts and normalizes the submitted e
   assert.equal((f.db.prepare('SELECT COUNT(*) count FROM password_reset_tokens').get() as { count: number }).count, 1);
 });
 
-test('reset token is random, stored only as SHA-256 digest, and expires after fifteen minutes', async t => {
+test('reset token is random, stored only as SHA-256 digest, and expires after five minutes', async t => {
   const f = fixture(t);
   const owner = await f.register();
   await expectAccepted(await f.forgot(owner.user.email));
   await waitFor(() => f.mails.length === 1, 'Expected reset email');
   const token = tokenFrom(f.mails[0]);
-  assert.equal(f.mails[0].expiresMinutes, 15);
+  assert.equal(f.mails[0].expiresMinutes, 5);
   const row = f.db.prepare('SELECT * FROM password_reset_tokens WHERE user_id=?').get(owner.user.id) as ResetRow;
   assert.ok(row);
   assert.ok(row.token_hash === createHash('sha256').update(token).digest('hex'), 'Only the token digest may be stored');
   assert.ok(!Object.values(row).includes(token), 'Raw reset token must not appear in any database column');
   assert.equal(row.used_at, null);
   const duration = new Date(row.expires_at).getTime() - new Date(row.created_at).getTime();
-  assert.ok(duration >= 15 * 60_000 - 1000 && duration <= 15 * 60_000 + 1000, 'Token TTL must be fifteen minutes');
+  assert.ok(duration >= 5 * 60_000 - 1000 && duration <= 5 * 60_000 + 1000, 'Token TTL must be five minutes');
 });
 
 test('requesting a reset does not change password or revoke the current session', async t => {
@@ -168,7 +168,7 @@ test('used token cannot reset the password again', async t => {
   await waitFor(() => f.mails.length === 1, 'Expected reset email');
   const token = tokenFrom(f.mails[0]);
   assert.equal((await f.reset(token)).status, 200);
-  await expectError(await f.reset(token, 'Another-long-password-2026!'), 400, 'INVALID_RESET_TOKEN');
+  await expectError(await f.reset(token, 'Another-2026!'), 400, 'INVALID_RESET_TOKEN');
   assert.equal((await f.login(owner.user.email, NEW_PASSWORD)).status, 200);
 });
 
@@ -197,6 +197,7 @@ test('malformed token or weak replacement password fails validation without cons
     await expectError(await f.reset(malformed), 400, 'VALIDATION_ERROR');
   }
   await expectError(await f.reset(token, 'short'), 400, 'VALIDATION_ERROR');
+  await expectError(await f.reset(token, 'x'.repeat(17)), 400, 'VALIDATION_ERROR');
   assert.equal((await f.reset(token)).status, 200, 'Validation failure must not consume the valid link');
 });
 
@@ -211,7 +212,7 @@ test('successful reset invalidates all other outstanding reset links for this us
   const otherMail = f.mails.find(mail => mail.to === other.user.email)!;
   const extraToken = 'b'.repeat(64);
   f.db.prepare('INSERT INTO password_reset_tokens(id,user_id,token_hash,expires_at,used_at,created_at) VALUES(?,?,?,?,?,?)')
-    .run(randomUUID(), owner.user.id, createHash('sha256').update(extraToken).digest('hex'), new Date(Date.now() + 15 * 60_000).toISOString(), null, new Date().toISOString());
+    .run(randomUUID(), owner.user.id, createHash('sha256').update(extraToken).digest('hex'), new Date(Date.now() + 5 * 60_000).toISOString(), null, new Date().toISOString());
   assert.equal((await f.reset(tokenFrom(ownerMail))).status, 200);
   await expectError(await f.reset(extraToken), 400, 'INVALID_RESET_TOKEN');
   assert.equal((await f.reset(tokenFrom(otherMail))).status, 200, 'One account must not invalidate another account links');
@@ -223,7 +224,7 @@ test('two concurrent submissions of one reset link have exactly one successful p
   await expectAccepted(await f.forgot(owner.user.email));
   await waitFor(() => f.mails.length === 1, 'Expected reset email');
   const token = tokenFrom(f.mails[0]);
-  const passwords = [NEW_PASSWORD, 'Other-competing-password-2026!'];
+  const passwords = [NEW_PASSWORD, 'Other-2026!'];
   const results = await Promise.all(passwords.map(password => f.reset(token, password)));
   assert.deepEqual(results.map(response => response.status).sort(), [200, 400]);
   const winner = results.findIndex(response => response.status === 200);
@@ -310,9 +311,9 @@ test('asynchronous send failure keeps the generic response and removes only the 
   const existingToken = 'c'.repeat(64);
   const olderOwnerToken = 'e'.repeat(64);
   f.db.prepare('INSERT INTO password_reset_tokens(id,user_id,token_hash,expires_at,used_at,created_at) VALUES(?,?,?,?,?,?)')
-    .run(randomUUID(), other.user.id, createHash('sha256').update(existingToken).digest('hex'), new Date(Date.now() + 15 * 60_000).toISOString(), null, new Date().toISOString());
+    .run(randomUUID(), other.user.id, createHash('sha256').update(existingToken).digest('hex'), new Date(Date.now() + 5 * 60_000).toISOString(), null, new Date().toISOString());
   f.db.prepare('INSERT INTO password_reset_tokens(id,user_id,token_hash,expires_at,used_at,created_at) VALUES(?,?,?,?,?,?)')
-    .run(randomUUID(), owner.user.id, createHash('sha256').update(olderOwnerToken).digest('hex'), new Date(Date.now() + 15 * 60_000).toISOString(), null, new Date(Date.now() - 120_000).toISOString());
+    .run(randomUUID(), owner.user.id, createHash('sha256').update(olderOwnerToken).digest('hex'), new Date(Date.now() + 5 * 60_000).toISOString(), null, new Date(Date.now() - 120_000).toISOString());
   const generic = await expectAccepted(await f.forgot(owner.user.email));
   assert.ok(!JSON.stringify(generic).includes('SMTP'));
   await waitFor(() => f.sends() === 1, 'Expected the asynchronous mail stub to be called');

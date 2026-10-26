@@ -50,11 +50,11 @@ Request ถัดไป: `sessionMiddleware()` ตรวจ signature, algorithm
 
 JWT ใช้ลายเซ็นตรวจว่าข้อมูลถูกแก้หรือไม่ Payload ของ JWT อ่านได้ จึงไม่ใส่ password หรือ secrets HttpOnly ช่วยไม่ให้ JavaScript อ่าน cookie โดยตรง แต่หน้าเว็บที่มี XSS ยังอาจส่ง request ในนามผู้ใช้ได้
 
-Logout: ยกเลิก session ใน SQL และลบ cookie ดังนั้น token ที่คัดลอกก่อน logout ก็ไม่ผ่าน session check อายุ JWT 30 นาที ไม่มี refresh flow เพื่อลดขอบเขตที่ต้องเข้าใจ
+Logout: ยกเลิก session ใน SQL และลบ cookie ดังนั้น token ที่คัดลอกก่อน logout ก็ไม่ผ่าน session check อายุ JWT 5 ชั่วโมง ไม่มี refresh flow เพื่อลดขอบเขตที่ต้องเข้าใจ
 
 ### 5.1 password-reset.ts และ mail.ts
 
-ผู้ใช้กด **ลืมรหัสผ่าน?** แล้วส่งอีเมลไป `POST /api/auth/forgot-password` เมื่อ SMTP ตั้งค่าแล้ว API ตอบ 202 ด้วยข้อความกลาง ไม่บอกว่ามีบัญชีหรือไม่ สำหรับบัญชีที่มีอยู่และยังไม่เกิน limit ระบบสุ่ม token 32 bytes เก็บเฉพาะ SHA-256 digest ใน SQL และกำหนดอายุ 15 นาที
+ผู้ใช้กด **ลืมรหัสผ่าน?** แล้วส่งอีเมลไป `POST /api/auth/forgot-password` เมื่อ SMTP ตั้งค่าแล้ว API ตอบ 202 ด้วยข้อความกลาง ไม่บอกว่ามีบัญชีหรือไม่ สำหรับบัญชีที่มีอยู่และยังไม่เกิน limit ระบบสุ่ม token 32 bytes เก็บเฉพาะ SHA-256 digest ใน SQL และกำหนดอายุ 5 นาที
 
 `mail.ts` ใช้ Nodemailer ส่งอีเมลผ่าน Gmail SMTP โดยอ่าน credential จาก `.env` ฝั่ง server และสร้างลิงก์จาก `APP_PUBLIC_URL` ที่ตั้งไว้ ลิงก์เป็น `/reset-password#token=...` แทนการสร้าง host จาก request ของผู้เรียก การตั้ง App Password และ URL อธิบายทีละขั้นใน [คู่มือลืมรหัสผ่าน](password-reset-gmail.md) งานนี้ส่งจาก backend โดยตรง ไม่ผ่าน n8n
 
@@ -90,7 +90,7 @@ Tailwind เป็น utility classes สำหรับจัด layout สี 
 
 ฟอร์มวันที่อ่านค่าจริงจาก input ผ่าน FormData ตอน submit และรับ onInput/onChange เพื่อไม่ให้ค่าที่ผู้ใช้เลือกหายระหว่างการอัปเดต state การทดสอบผ่านหน้าเว็บเป็นตัวที่ช่วยพบปัญหานี้ แม้ typecheck จะผ่านก็ตาม
 
-หน้า reset อ่าน token จาก URL fragment แล้วลบ fragment ออกจากแถบที่อยู่ก่อนแสดงหน้า เก็บ token ไว้ใน React memory เท่านั้น ผู้ใช้กรอกรหัสใหม่ 12–128 ตัวอักษรและยืนยันให้ตรงกันก่อนเรียก API การ refresh ทำให้ token ใน memory หาย ต้องเปิดลิงก์ต้นฉบับจากอีเมลอีกครั้งหรือขอใหม่ถ้าหมดอายุ/ใช้แล้ว
+หน้า reset อ่าน token จาก URL fragment แล้วลบ fragment ออกจากแถบที่อยู่ก่อนแสดงหน้า เก็บ token ไว้ใน React memory เท่านั้น ผู้ใช้กรอกรหัสใหม่ 8–16 ตัวอักษรและยืนยันให้ตรงกันก่อนเรียก API การ refresh ทำให้ token ใน memory หาย ต้องเปิดลิงก์ต้นฉบับจากอีเมลอีกครั้งหรือขอใหม่ถ้าหมดอายุ/ใช้แล้ว
 
 ## 8. apps/api/src/integrations.ts และ n8n
 

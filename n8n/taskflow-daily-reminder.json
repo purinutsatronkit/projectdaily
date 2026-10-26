@@ -14,19 +14,18 @@
           ]
         }
       },
-      "id": "taskflow-daily",
+      "id": "20c29ce4-7cdb-4d1a-a3a6-96daa9785cfa",
       "name": "Daily 07:30 Bangkok",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
         0,
-        240
+        512
       ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "http://localhost:3000/api/integrations/due-tasks",
+        "url": "http://host.docker.internal:3000/api/integrations/due-tasks",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -38,14 +37,20 @@
           "timeout": 15000
         }
       },
-      "id": "taskflow-get",
+      "id": "c24581a5-9f16-4d81-b3cc-362b616d27ee",
       "name": "Get due tasks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
         240,
-        240
-      ]
+        512
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wFDVlCKG5bKlnOXR",
+          "name": "Header Auth account"
+        }
+      }
     },
     {
       "parameters": {
@@ -71,20 +76,18 @@
         },
         "options": {}
       },
-      "id": "taskflow-check",
+      "id": "f8b1ffbf-6169-4df4-ac4c-e5f73a214e50",
       "name": "Has due tasks?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
         480,
-        240
+        512
       ]
     },
     {
       "parameters": {
-        "resource": "email",
-        "operation": "send",
-        "fromEmail": "TaskFlow <your-smtp-address@example.com>",
+        "fromEmail": "purinut.satronkit@gmail.com",
         "toEmail": "={{ $json.user.email }}",
         "subject": "={{ 'TaskFlow: ' + $json.tasks.length + ' งานที่ต้องทำ — ' + $json.date }}",
         "emailFormat": "text",
@@ -94,24 +97,30 @@
           "allowUnauthorizedCerts": false
         }
       },
-      "id": "taskflow-email",
+      "id": "5280aee9-261f-4d31-bb34-d6151af49ba2",
       "name": "Send task summary",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
         720,
-        160
+        432
       ],
-      "retryOnFail": false
+      "retryOnFail": false,
+      "webhookId": "925271e1-b83f-4d71-90d4-1ebcba5940be",
+      "credentials": {
+        "smtp": {
+          "id": "XSZwlkpUwqr9xEtV",
+          "name": "SMTP account"
+        }
+      }
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:3000/api/integrations/reminders",
+        "url": "http://host.docker.internal:3000/api/integrations/reminders",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
-        "contentType": "json",
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ task_ids: $('Get due tasks').first().json.tasks.map(task => task.id), date: $('Get due tasks').first().json.date, channel: 'email' }) }}",
         "options": {
@@ -123,17 +132,23 @@
           "timeout": 15000
         }
       },
-      "id": "taskflow-record",
+      "id": "49d6194e-c795-423b-aaca-2cb4d3421b25",
       "name": "Record sent reminders",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
         960,
-        160
+        432
       ],
       "retryOnFail": true,
       "maxTries": 3,
-      "waitBetweenTries": 1000
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wFDVlCKG5bKlnOXR",
+          "name": "Header Auth account"
+        }
+      }
     },
     {
       "parameters": {
@@ -142,16 +157,17 @@
         "width": 620,
         "color": 5
       },
-      "id": "taskflow-note",
+      "id": "51d4bbe3-b653-4b9c-baa8-ee12d669273e",
       "name": "Setup and limitations",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
         160,
-        -270
+        0
       ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Daily 07:30 Bangkok": {
       "main": [
@@ -183,8 +199,7 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
     "Send task summary": {
@@ -201,9 +216,16 @@
   },
   "active": false,
   "settings": {
+    "timezone": "Asia/Bangkok",
     "executionOrder": "v1",
-    "timezone": "Asia/Bangkok"
+    "binaryMode": "separate"
   },
-  "pinData": {},
+  "versionId": "bdaf2252-2dda-4921-9115-f56841c8e746",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ba017d75a19ce57dfcf086109ee6de219cda2048b1011f06e36f0fe8c69701d7"
+  },
+  "nodeGroups": [],
+  "id": "zNgYfzNowxC711aP",
   "tags": []
 }

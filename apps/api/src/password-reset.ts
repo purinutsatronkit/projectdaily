@@ -7,7 +7,7 @@ import type { Database } from './db.ts';
 import { hashPassword } from './security.ts';
 import { trustedPublicUrl } from './mail.ts';
 
-const EXPIRES_MINUTES = 15;
+const EXPIRES_MINUTES = 5;
 const GENERIC_MESSAGE = 'หากอีเมลนี้มีบัญชีอยู่ในระบบ คุณจะได้รับลิงก์ตั้งรหัสผ่านใหม่ กรุณาตรวจกล่องจดหมายและสแปม';
 const digest = (token: string) => createHash('sha256').update(token).digest('hex');
 interface ResetToken { id: string; user_id: string; token_hash: string; expires_at: string; used_at: string | null }

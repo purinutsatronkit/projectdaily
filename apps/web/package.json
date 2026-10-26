@@ -12,7 +12,11 @@
     "@fontsource/ibm-plex-sans-thai": "^5.3.0",
     "@taskflow/shared": "*",
     "lucide-react": "^0.468.0",
+    "pdfmake": "^0.2.20",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/pdfmake": "^0.2.12"
   }
 }

@@ -18,7 +18,7 @@ export const hashApiKey = (secret: string) => createHash('sha256').update(secret
 export async function issueToken(userId: string, sessionId: string, secret: string) {
   return new SignJWT({ sid: sessionId }).setProtectedHeader({ alg: 'HS256' })
     .setSubject(userId).setIssuer('taskflow').setAudience('taskflow-web')
-    .setIssuedAt().setExpirationTime('30m').sign(new TextEncoder().encode(secret));
+    .setIssuedAt().setExpirationTime('5h').sign(new TextEncoder().encode(secret));
 }
 export async function verifyToken(token: string, secret: string) {
   return (await jwtVerify(token, new TextEncoder().encode(secret), {

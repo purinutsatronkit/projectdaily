@@ -127,7 +127,7 @@ Shared types ช่วยให้พบความผิดพลาดขณ�
 
 ระบบนี้เป็นงานเรียนรู้ที่ตั้งใจทำให้รันจริง ตรวจสอบได้ และมีข้อจำกัดชัดเจน คำว่า “Production Ready” ในชื่อวิดีโอไม่ใช่ใบรับรองของ TaskFlow ก่อนใช้งานภายนอกต้องมี HTTPS, secret จริง, backup/restore ที่ทดลองแล้ว และดูแล deployment ตาม README ของโปรเจกต์
 
-TaskFlow ไม่ได้คัดลอกทุก implementation จากคลิป: ใช้ JWT 30 นาทีใน HttpOnly cookie พร้อม session ใน SQL ที่ logout แล้วเพิกถอนได้ ใช้ SQLite/prepared queries และงานส่วนตัวแทน library/admin ตัวอย่าง API key เพิ่มวันหมดอายุและ soft revocation ส่วน n8n เป็นการต่อยอดของงานนี้ ตัวเลขและกลไกเหล่านี้เป็นการตัดสินใจของ TaskFlow ไม่ใช่คำอ้างจากผู้สอน
+TaskFlow ไม่ได้คัดลอกทุก implementation จากคลิป: ใช้ JWT 5 ชั่วโมงใน HttpOnly cookie พร้อม session ใน SQL ที่ logout แล้วเพิกถอนได้ ใช้ SQLite/prepared queries และงานส่วนตัวแทน library/admin ตัวอย่าง API key เพิ่มวันหมดอายุและ soft revocation ส่วน n8n เป็นการต่อยอดของงานนี้ ตัวเลขและกลไกเหล่านี้เป็นการตัดสินใจของ TaskFlow ไม่ใช่คำอ้างจากผู้สอน
 
 ## สิ่งที่ต่อยอดจาก FoodPreOrder อย่างวัดได้
 

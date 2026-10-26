@@ -7,16 +7,22 @@ import { resolve } from 'node:path';
 import { openDatabase } from './db.ts';
 import { createApp } from './app.ts';
 import { resetEmailFromEnvironment } from './mail.ts';
+import { clientIp, trustedProxyIps } from './client-ip.ts';
+import { socialFromEnvironment } from './social-config.ts';
 
 const root = fileURLToPath(new URL('../../../',import.meta.url));
 const production = process.env.NODE_ENV === 'production';
+const proxies=trustedProxyIps(process.env.TRUSTED_PROXY_IPS);
 const passwordReset = resetEmailFromEnvironment();
 if (!passwordReset) console.warn('Password reset email is not configured. Set SMTP_USER and SMTP_PASS in .env; see docs/password-reset-gmail.md');
 if (production && !process.env.APP_ORIGIN?.startsWith('https://')) throw new Error('Production APP_ORIGIN must use HTTPS.');
 const db = openDatabase(resolve(root,process.env.DATABASE_PATH ?? './data/taskflow.sqlite'));
-const app = createApp(db,{secret:process.env.JWT_SECRET ?? '',production,passwordReset,
-  origins:[process.env.APP_ORIGIN ?? 'http://localhost:5173',...(!production ? ['http://localhost:3000'] : [])],
-  clientIp:c => getConnInfo(c).remote.address ?? 'unknown'});
+const app = createApp(db,{secret:process.env.JWT_SECRET ?? '',production,passwordReset,social:socialFromEnvironment(),
+  origins:[process.env.APP_ORIGIN ?? 'http://localhost:5173',...(!production ? [
+    'http://localhost:5173','http://127.0.0.1:5173',
+    'http://localhost:3000','http://127.0.0.1:3000',
+  ] : [])],
+  clientIp:c => clientIp(getConnInfo(c).remote.address,c.req.header('x-forwarded-for'),proxies)});
 const publicPath = resolve(root,'apps/web/dist');
 if (existsSync(publicPath)) {
   app.get('*',async(c,next) => c.req.path.startsWith('/api/') ? next() : serveStatic({root:publicPath})(c,next));

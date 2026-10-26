@@ -26,7 +26,7 @@ export function keyRoutes(db: Database) {
   });
   return routes;
 }
-export function integrationRoutes(db: Database) {
+export function integrationRoutes(db: Database, production=false) {
   const routes = new Hono<Env>();
   routes.use('*', async (c,next) => {
     const raw = c.req.header('x-api-key');
@@ -34,7 +34,7 @@ export function integrationRoutes(db: Database) {
     const key = get<{ id: string; user_id: string }>(db,'SELECT id,user_id FROM api_keys WHERE secret_hash=? AND scope=? AND revoked_at IS NULL AND expires_at>?',hashApiKey(raw),'reminders',now());
     if (!key) throw new ApiError(401,'INVALID_API_KEY','API key หมดอายุหรือถูกยกเลิก');
     const user = get<User>(db,'SELECT id,name,email FROM users WHERE id=?',key.user_id);
-    if (!user) throw new ApiError(401,'INVALID_API_KEY','API key ไม่ถูกต้อง');
+    if (!user || (production && user.email === 'demo@taskflow.local')) throw new ApiError(401,'INVALID_API_KEY','API key ไม่ถูกต้อง');
     c.set('user',user);
     db.prepare('UPDATE api_keys SET last_used_at=? WHERE id=?').run(now(),key.id);
     await next();
