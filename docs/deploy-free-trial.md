@@ -20,9 +20,11 @@ Vercel Hobby เปิดหน้าเว็บฟรีสำหรับก�
 
 Render จะให้ URL ฟรีแบบ `*.onrender.com` และแอปเสิร์ฟหน้าเว็บกับ API จาก URL นี้อยู่แล้ว จึงลองเปิดหน้าเว็บชั่วคราวได้ ก่อนย้ายหน้าเว็บไป Vercel
 
-## ขั้นต่อไป: Vercel
+## Vercel ที่เชื่อมแล้ว
 
-เมื่อรู้ URL Render ที่แน่นอนแล้ว จึงใส่ URL นั้นใน rewrite `/api` ของ Vercel และ deploy หน้าเว็บ Vite จาก repository นี้ จากนั้นเปลี่ยน `APP_ORIGIN`, `APP_PUBLIC_URL` และ OAuth redirect URIs ให้ใช้ URL Vercel เดียวกัน เพื่อให้ cookie และ callback ทำงานบนเว็บที่ผู้ใช้เปิดจริง
+หน้าเว็บหลักคือ `https://projectdaily-hazel.vercel.app` และ `vercel.json` ส่ง `/api` ไปที่ `https://taskflow-h64l.onrender.com` โดยยังคง URL ของ Vercel ใน browser. `APP_ORIGIN` และ `APP_PUBLIC_URL` บน Render ถูกตั้งเป็น URL Vercel เดียวกัน เพื่อให้คำขอจากเว็บและ cookie ทำงานร่วมกัน
+
+หลัง Render redeploy ให้ตรวจ `https://projectdaily-hazel.vercel.app/api/health` และทดลองสมัคร/ล็อกอินด้วยข้อมูลทดสอบเท่านั้น หากต้องเปิด Google หรือ GitHub ให้เพิ่ม callback URLs ที่ใช้โดเมน Vercel ใน provider ก่อน แล้วจึงตั้ง secrets บน Render
 
 ## เมื่อจะให้คนอื่นใช้งานจริง
 
