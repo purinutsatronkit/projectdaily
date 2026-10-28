@@ -11,7 +11,9 @@ export interface Config {
   secret: string; origins: string[]; production?: boolean; silent?: boolean; authLimit?: number;
   resetRequestLimit?: number; resetSubmitLimit?: number;
   passwordReset?: PasswordResetConfig;
+  dailyEmailEnabled?: boolean;
   social?: import('./social-config.ts').SocialConfig;
+  assistant?: {key?:string;model?:string;fetch?:typeof fetch};
   clientIp?: (c: AppContext) => string;
 }
 export class ApiError extends Error {

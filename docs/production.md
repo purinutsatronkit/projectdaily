@@ -28,7 +28,13 @@
 - การยืนยันอีเมลยังเป็นสถานะบัญชี ไม่ได้บังคับก่อนใช้งานทุกฟีเจอร์ รวมถึงบัญชีเดิม ต้องตัดสินนโยบายก่อนเปิดทั่วไป
 - สำรองข้อมูลด้วย `npm.cmd run db:backup` และตรวจสำเนาด้วย `npm.cmd run db:restore-check -- <backup> <new-file>`; จัด retention และลบสำเนาตามนโยบายข้อมูลส่วนตัว
 
-## n8n
+## อีเมลเตือนงาน
+
+- เซิร์ฟเวอร์ TaskFlow ส่งเมลหลัง 07:00 น. เวลาไทยให้บัญชีที่ยืนยันอีเมลและมีงานค้าง โดยใช้ SMTP ชุดเดียวกับอีเมลบัญชี ดู [คู่มืออีเมลเตือนงาน](email-reminders.md)
+- ให้ process supervisor รักษาเซิร์ฟเวอร์ให้ทำงานต่อเนื่อง หากรันหลาย instance ให้ตั้ง `EMAIL_REMINDERS_ENABLED=false` บนตัวอื่นและเหลือตัวส่งเมลเพียงตัวเดียว หรือเพิ่ม distributed lock ก่อนขยายบริการ
+- ปิด n8n workflow เตือนงานเดิมเพื่อหลีกเลี่ยงการส่งซ้ำ
+
+## n8n แบบเลือกใช้
 
 - ไฟล์ `n8n/taskflow-daily-reminder.json` ตั้ง daily 07:30 และ `Asia/Bangkok` แบบ explicit แล้ว ต้อง import/ปรับ workflow ที่ใช้งานอยู่และ Publish ให้มีผล
 - Credential references ใน export ต้องเลือกให้ตรงกับ credentials บน instance ปลายทาง

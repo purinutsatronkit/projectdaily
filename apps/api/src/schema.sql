@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS reminder_deliveries (
  notification_date TEXT NOT NULL, channel TEXT NOT NULL CHECK(channel = 'email'), created_at TEXT NOT NULL,
  UNIQUE(user_id,task_id,notification_date,channel)
 );
+CREATE TABLE IF NOT EXISTS email_reminder_batches (
+ user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ reminder_date TEXT NOT NULL, sent_at TEXT NOT NULL,
+ PRIMARY KEY(user_id,reminder_date)
+);
 CREATE TABLE IF NOT EXISTS notification_batches (
  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  notification_date TEXT NOT NULL, created_at TEXT NOT NULL,
