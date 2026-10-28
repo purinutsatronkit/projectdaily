@@ -6,4 +6,6 @@ backups/
 *.log
 presentation/.build/
 artifacts/
+playwright-report/
+test-results/
 .DS_Store

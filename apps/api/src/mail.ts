@@ -2,7 +2,8 @@ import nodemailer, { type Transporter } from 'nodemailer';
 import { z } from 'zod';
 import type { PasswordResetConfig } from './context.ts';
 
-export interface ResetEmailService extends PasswordResetConfig { verify: () => Promise<void> }
+export interface TaskReminderMail {to:string;name:string;date:string;tasks:{title:string;due_date:string;priority:string}[]}
+export interface ResetEmailService extends PasswordResetConfig { verify: () => Promise<void>; sendTaskReminder: (mail: TaskReminderMail) => Promise<void> }
 
 export function trustedPublicUrl(value: string, production = false) {
   const url = new URL(value);
@@ -30,6 +31,13 @@ export function createResetEmailService(transport: Transporter, publicUrl: strin
     },
     sendVerification:async({to,verifyUrl})=>{
       const result=await transport.sendMail({from,to,subject:'ยืนยันอีเมลสำหรับ TaskFlow',text:`เปิดลิงก์นี้เพื่อยืนยันอีเมล TaskFlow ภายใน 15 นาที:\n${verifyUrl}\n\nหากไม่ได้ขอ ให้ละเว้นอีเมลนี้`,disableFileAccess:true,disableUrlAccess:true});
+      if(!result.accepted?.length)throw new Error('SMTP_RECIPIENT_REJECTED');
+    },
+    sendTaskReminder:async({to,name,date,tasks})=>{
+      const labels:{[key:string]:string}={high:'สูง',medium:'ปกติ',low:'ต่ำ'};
+      const lines=tasks.slice(0,100).map((task,index)=>`${index+1}. ${task.title} — กำหนดส่ง ${task.due_date} · ความสำคัญ${labels[task.priority]??'ปกติ'}`);
+      const overflow=tasks.length>100?`\nและอีก ${tasks.length-100} งาน ดูทั้งหมดใน TaskFlow`:'';
+      const result=await transport.sendMail({from,to,subject:`TaskFlow: งานที่ต้องทำ ${date}`,text:`สวัสดี ${name}\n\nงานที่ยังไม่เสร็จและครบกำหนดแล้ว ณ ${date} (${tasks.length} งาน)\n\n${lines.join('\n')}${overflow}\n\nเปิด TaskFlow เพื่อดูหรืออัปเดตงาน: ${publicUrl}\n\nอีเมลนี้ส่งอัตโนมัติหลังยืนยันอีเมลบัญชี TaskFlow`,disableFileAccess:true,disableUrlAccess:true});
       if(!result.accepted?.length)throw new Error('SMTP_RECIPIENT_REJECTED');
     },
   };

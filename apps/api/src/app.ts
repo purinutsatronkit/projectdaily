@@ -15,6 +15,7 @@ import { socialRoutes } from './social.ts';
 import { githubRoutes } from './github.ts';
 import {projectRoutes} from './projects.ts';
 import {verificationRoutes} from './email-verification.ts';
+import {assistantRoutes} from './assistant.ts';
 import {dataRightsRoutes} from './data-rights.ts';
 
 export function createApp(db: Database,config: Config) {
@@ -62,13 +63,16 @@ export function createApp(db: Database,config: Config) {
   app.use('/api/projects',session);
   app.use('/api/projects/*',session);
   app.route('/api/projects',projectRoutes(db));
+  app.use('/api/assistant/*',session);
+  app.use('/api/assistant/plan',rateLimit('assistant',30,'ถาม AI บ่อยเกินไป กรุณารอสักครู่'));
+  app.route('/api/assistant',assistantRoutes(db,config.assistant));
   app.use('/api/account',session);
   app.use('/api/account/*',session);
   app.route('/api/account',accountRoutes(db,config));
   app.route('/api/account',dataRightsRoutes(db,config));
   app.use('/api/sk09/*',session);
   app.route('/api/sk09',sk09Routes(db));
-  for (const path of ['/api/tasks/*','/api/keys/*','/api/summary','/api/reminders','/api/notifications/*']) app.use(path,session);
+  for (const path of ['/api/tasks/*','/api/keys/*','/api/summary','/api/reminders','/api/reminders/*','/api/notifications/*']) app.use(path,session);
   app.route('/api/tasks',taskRoutes(db));
   app.route('/api/keys',keyRoutes(db));
   app.get('/api/summary',c => {
@@ -78,6 +82,7 @@ export function createApp(db: Database,config: Config) {
   });
   app.route('/api/notifications',notificationRoutes(db));
   app.get('/api/reminders',c => c.json({reminders:readReminders(db,c.get('user').id)}));
+  app.get('/api/reminders/settings',c=>c.json({available:config.dailyEmailEnabled!==false&&!!(config.passwordReset&&'sendTaskReminder'in config.passwordReset),verified:!!c.get('user').email_verified_at,schedule:'07:00 Asia/Bangkok'}));
   app.route('/api/integrations',integrationRoutes(db,config.production));
   app.get('/api/health',c => { db.prepare('SELECT 1').get(); return c.json({status:'ok',service:'taskflow-api'}); });
   app.notFound(c => c.json({error:{code:'NOT_FOUND',message:'ไม่พบเส้นทางนี้',request_id:c.get('requestId')}},404));

@@ -11,27 +11,32 @@ export default function Notifications({ revision, onSelect, onGitHub, onExpired 
   const [loading,setLoading] = useState(true), [error,setError] = useState(''), [retry,setRetry] = useState(0);
   const [reading,setReading]=useState(false);
   const currentLoad=useRef<AbortController | null>(null);
+  const hasLoaded=useRef(false), lastTaskCheck=useRef(0), lastGitHubCheck=useRef(0);
   const root = useRef<HTMLDivElement>(null), button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     let active = true, current: AbortController | undefined;
-    async function load() {
+    async function load(forceTask=false) {
+      if(document.visibilityState==='hidden'||(!forceTask&&Date.now()-lastTaskCheck.current<15000))return;
+      lastTaskCheck.current=Date.now();
       current?.abort(); const controller = new AbortController(); current = controller;
       currentLoad.current=controller;
-      setLoading(true);
+      if(!hasLoaded.current)setLoading(true);
       try {
         const response = await fetch('/api/notifications',{credentials:'same-origin',signal:controller.signal});
         if(response.status===401) { onExpired(); return; }
         if(!response.ok) throw new Error('โหลดการแจ้งเตือนไม่สำเร็จ');
         const result: Data = await response.json();
-        if(active && !controller.signal.aborted) { setData(result); setError(''); }
-        try{const github=await fetch('/api/github/alerts',{credentials:'same-origin',signal:controller.signal});if(github.status===401){onExpired();return;}if(!github.ok)throw new Error('โหลดสถานะ GitHub ไม่สำเร็จ');const info=await github.json();if(active&&!controller.signal.aborted){setPipeline(info.notifications);setPipelineError(info.failures?'ตรวจ pipeline บาง repository ไม่สำเร็จ ตรวจสิทธิ์ GitHub App':'' );}}catch(err){if(active&&!controller.signal.aborted)setPipelineError(err instanceof Error?err.message:'โหลดสถานะ GitHub ไม่สำเร็จ');}
+        if(active && !controller.signal.aborted) { hasLoaded.current=true;setData(result); setError('');setLoading(false); }
+        if(Date.now()-lastGitHubCheck.current<300000)return;
+        lastGitHubCheck.current=Date.now();
+        try{const github=await fetch('/api/github/alerts',{credentials:'same-origin',signal:controller.signal});if(github.status===401){onExpired();return;}if(!github.ok)throw new Error('โหลดสถานะ GitHub ไม่สำเร็จ');const info=await github.json();if(active&&!controller.signal.aborted){setPipeline(info.notifications);setPipelineError(info.failures?'ตรวจ pipeline บาง repository ไม่สำเร็จ ตรวจสิทธิ์ GitHub App':'' );}}catch(err){if(controller.signal.aborted)lastGitHubCheck.current=0;else if(active)setPipelineError(err instanceof Error?err.message:'โหลดสถานะ GitHub ไม่สำเร็จ');}
       } catch(err) { if(active && !controller.signal.aborted) setError(err instanceof Error ? err.message : 'โหลดการแจ้งเตือนไม่สำเร็จ'); }
       finally { if(active && !controller.signal.aborted) setLoading(false); }
     }
-    void load(); const timer=window.setInterval(()=>void load(),60000);
+    void load(true); const timer=window.setInterval(()=>void load(),60000);
     const focus=()=>void load(); window.addEventListener('focus',focus);
     return ()=>{active=false;current?.abort();window.clearInterval(timer);window.removeEventListener('focus',focus);};
-  },[revision,retry,open,onExpired]);
+  },[revision,retry,onExpired]);
   useEffect(()=>{
     if(!open) return;
     const outside=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node)) setOpen(false);};
@@ -79,7 +84,7 @@ export default function Notifications({ revision, onSelect, onGitHub, onExpired 
           </button>;
         })}{pipeline.map(alert=><button type="button" key={alert.id} className="notification-item" disabled={reading} onClick={()=>void markRead(undefined,alert)}><span className="notification-dot notification-dot-overdue"/><span className="min-w-0 flex-1 text-left"><span className="block text-xs font-semibold text-red-700">GitHub pipeline ไม่ผ่าน</span><span className="mt-1 block break-words text-sm font-semibold">{alert.title}</span><span className="mt-1 block text-xs text-slate-500">{alert.repository} · Run #{alert.run_id}</span></span></button>)}</>}
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3"><span className="text-xs text-slate-500">ยังไม่อ่าน {count} รายการ</span><div className="flex items-center gap-2">{count>0&&<button type="button" className="text-xs font-semibold text-teal-700 underline" disabled={reading||loading} onClick={()=>void markRead()}>อ่านทั้งหมด</button>}<button type="button" className="icon-button" aria-label="รีเฟรชการแจ้งเตือน" disabled={loading||reading} onClick={()=>setRetry(value=>value+1)}><RefreshCw size={16} className={loading?'animate-spin':''}/></button></div></div>
+      <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3"><span className="text-xs text-slate-500">ยังไม่อ่าน {count} รายการ</span><div className="flex items-center gap-2">{count>0&&<button type="button" className="text-xs font-semibold text-teal-700 underline" disabled={reading||loading} onClick={()=>void markRead()}>อ่านทั้งหมด</button>}<button type="button" className="icon-button" aria-label="รีเฟรชการแจ้งเตือน" disabled={loading||reading} onClick={()=>{lastGitHubCheck.current=0;setRetry(value=>value+1);}}><RefreshCw size={16} className={loading?'animate-spin':''}/></button></div></div>
     </section>}
   </div>;
 }
