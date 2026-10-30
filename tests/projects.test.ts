@@ -8,6 +8,10 @@ function fixture(t:import('node:test').TestContext){
   const db=openDatabase(':memory:');t.after(()=>db.close());let runStatus:'queued'|'completed'='queued';
   const fakeFetch=(async(input:any)=>{
     const url=String(input);
+    if(url.endsWith('/pulls/12'))return Response.json({number:12,title:'Review feature',state:'open',merged:false,draft:false,html_url:'https://github.com/owner/repo/pull/12',head:{sha:'a'.repeat(40)},additions:8,deletions:2,changed_files:1});
+    if(url.includes('/pulls/12/reviews'))return Response.json([{user:{login:'reviewer'},state:'APPROVED'}]);
+    if(url.includes('/pulls/12/files'))return Response.json([{filename:'src/app.ts',status:'modified',additions:8,deletions:2}]);
+    if(url.includes('/check-runs'))return Response.json({check_runs:[{name:'tests',status:'completed',conclusion:'success'}]});
     if(url.includes('/actions/runs?'))return Response.json({workflow_runs:[{id:101,workflow_id:42,status:runStatus,conclusion:runStatus==='completed'?'failure':null,display_title:'Unit tests'}]});
     return Response.json({message:'Not mocked'},{status:404});
   }) as typeof fetch;
@@ -30,6 +34,12 @@ test('projects isolate users, keep legacy unassigned tasks, filter summaries and
   assert.equal((await f.request(`/api/tasks/sk09/suggestions?start=2026-10-26&project_id=${project.id}`,other.cookie)).status,404);
   assert.equal((await f.request(`/api/projects/${project.id}`,owner.cookie,'DELETE')).status,204);
   assert.equal((await (await f.request('/api/tasks?project_id=unassigned',owner.cookie)).json()).tasks[0].id,taskId);
+});
+test('linked pull request summary includes reviews, changed files and checks',async t=>{
+  const f=fixture(t),owner=await f.register('pr-owner@example.com');
+  f.db.prepare('INSERT INTO connected_accounts VALUES(?,?,?,?,?,?)').run(owner.user.id,'github','9','owner',seal(JSON.stringify({access_token:'mock',expires_at:null}),key,owner.user.id),new Date().toISOString());
+  const response=await f.request('/api/github/repos/owner/repo/pulls/12/summary',owner.cookie);assert.equal(response.status,200);
+  const data=await response.json();assert.equal(data.title,'Review feature');assert.equal(data.reviews[0].state,'APPROVED');assert.equal(data.files[0].filename,'src/app.ts');assert.equal(data.checks[0].conclusion,'success');
 });
 test('GitHub links validate URL, stay scoped to the task owner and appear in account export without credentials',async t=>{
   const f=fixture(t),owner=await f.register('owner@example.com'),other=await f.register('other@example.com');
@@ -95,6 +105,10 @@ test('shared project roles isolate tasks and control edits and assignment',async
   assert.equal((await f.request(`/api/shared-projects/${id}/members`,editor.cookie,'POST',{email:outsider.user.email,role:'editor'})).status,403);
   const task=await f.request(`/api/shared-projects/${id}/tasks`,editor.cookie,'POST',{title:'Review shared code',assigned_to:viewer.user.id});assert.equal(task.status,201);
   const taskId=(await task.json()).task.id;
+  assert.equal((await f.request(`/api/tasks/${taskId}/links`,editor.cookie,'POST',{url:'https://github.com/owner/repo/pull/12'})).status,201);
+  assert.equal((await (await f.request(`/api/tasks/${taskId}/links`,viewer.cookie)).json()).links.length,1);
+  assert.equal((await f.request(`/api/tasks/${taskId}/links`,viewer.cookie,'POST',{url:'https://github.com/owner/repo/pull/13'})).status,403);
+  assert.equal((await f.request(`/api/tasks/${taskId}/links`,outsider.cookie)).status,404);
   assert.equal((await f.request(`/api/shared-projects/${id}/tasks`,viewer.cookie,'POST',{title:'Cannot edit'})).status,403);
   assert.equal((await f.request(`/api/shared-projects/${id}/tasks/${taskId}`,viewer.cookie,'PATCH',{status:'completed'})).status,403);
   const changed=await f.request(`/api/shared-projects/${id}/tasks/${taskId}`,editor.cookie,'PATCH',{status:'completed'});assert.equal(changed.status,200,await changed.text());

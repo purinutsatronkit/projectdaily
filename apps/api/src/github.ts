@@ -105,6 +105,21 @@ export function githubRoutes(db:Database,config:Config) {
     const item=await api(c.get('user').id,`${base(c.req.param('owner'),c.req.param('repo'))}/pulls/${parse(numberId,c.req.param('number'))}`);
     return c.json({title:item.title,state:item.state,merged:item.merged,draft:item.draft,number:item.number,html_url:item.html_url});
   });
+  routes.get('/repos/:owner/:repo/pulls/:number/summary',async c=>{
+    const path=`${base(c.req.param('owner'),c.req.param('repo'))}/pulls/${parse(numberId,c.req.param('number'))}`,userId=c.get('user').id;
+    const item=await api(userId,path);
+    const [reviews,files,checks]=await Promise.allSettled([
+      api(userId,`${path}/reviews?per_page=100`),
+      api(userId,`${path}/files?per_page=100`),
+      api(userId,`${base(c.req.param('owner'),c.req.param('repo'))}/commits/${encodeURIComponent(String(item.head?.sha??''))}/check-runs?per_page=100`),
+    ]);
+    const reviewList=reviews.status==='fulfilled'&&Array.isArray(reviews.value)?reviews.value:[];
+    const latest=new Map<string,string>();for(const review of reviewList){if(typeof review.user?.login==='string'&&typeof review.state==='string')latest.set(review.user.login,review.state);}
+    return c.json({title:item.title,number:item.number,state:item.state,merged:!!item.merged,draft:!!item.draft,html_url:item.html_url,head_sha:item.head?.sha??null,additions:item.additions??0,deletions:item.deletions??0,changed_files:item.changed_files??0,
+      reviews:[...latest].map(([login,state])=>({login,state})),files:files.status==='fulfilled'&&Array.isArray(files.value)?files.value.map((file:any)=>({filename:file.filename,status:file.status,additions:file.additions,deletions:file.deletions})):[],
+      checks:checks.status==='fulfilled'&&Array.isArray(checks.value?.check_runs)?checks.value.check_runs.map((check:any)=>({name:check.name,status:check.status,conclusion:check.conclusion,html_url:check.html_url})):[],
+      limited:{reviews:reviews.status==='rejected',files:files.status==='rejected',checks:checks.status==='rejected'}});
+  });
   routes.get('/repos/:owner/:repo/files',async c=>{
     const path=parse(z.string().max(2000).refine(v=>!v.split('/').some(p=>p==='.'||p==='..')&&!/[\x00-\x1f\\]/.test(v)),c.req.query('path')??'');
     const ref=parse(refSchema,c.req.query('ref'));

@@ -20,6 +20,8 @@ import {dataRightsRoutes} from './data-rights.ts';
 import {journalRoutes} from './journal.ts';
 import {sharedProjectRoutes} from './shared-projects.ts';
 import {focusRoutes} from './focus.ts';
+import {taskCommentRoutes} from './task-comments.ts';
+import {directChatRoutes} from './direct-chat.ts';
 
 export function createApp(db: Database,config: Config) {
   if (config.secret.length < 32) throw new Error('JWT_SECRET must have at least 32 characters. Run npm run setup.');
@@ -28,7 +30,9 @@ export function createApp(db: Database,config: Config) {
   app.use('*',secureHeaders({ strictTransportSecurity: config.production ? 'max-age=15552000; includeSubDomains' : false }));
   app.use('/api/*',async(c,next) => { c.header('Cache-Control','no-store'); await next(); });
   const limit = (maxSize: number, message: string) => bodyLimit({ maxSize, onError: (c: import('./context.ts').AppContext) => c.json({error:{code:'BODY_TOO_LARGE',message,request_id:c.get('requestId')}},413) });
-  app.use('/api/*', (c,next) => c.req.path === '/api/account/avatar' && c.req.method === 'PUT'
+  app.use('/api/*', (c,next) => /^\/api\/chat\/[^/]+\/messages$/.test(c.req.path) && c.req.method === 'POST'
+    ? limit(5 * 1024 * 1024 + 32 * 1024,'ไฟล์ต้องไม่เกิน 5 MB')(c,next)
+    : c.req.path === '/api/account/avatar' && c.req.method === 'PUT'
     ? limit(2 * 1024 * 1024,'รูปภาพต้องมีขนาดไม่เกิน 2 MB')(c,next)
     : c.req.path === '/api/sk09/draft' && c.req.method === 'PUT'
       ? limit(64 * 1024,'ร่างมีขนาดเกิน 64 KB')(c,next)
@@ -69,6 +73,9 @@ export function createApp(db: Database,config: Config) {
   app.use('/api/shared-projects',session);
   app.use('/api/shared-projects/*',session);
   app.route('/api/shared-projects',sharedProjectRoutes(db));
+  app.use('/api/chat',session);
+  app.use('/api/chat/*',session);
+  app.route('/api/chat',directChatRoutes(db));
   app.use('/api/focus',session);
   app.use('/api/focus/*',session);
   app.route('/api/focus',focusRoutes(db));
@@ -87,6 +94,7 @@ export function createApp(db: Database,config: Config) {
   app.route('/api/journal',journalRoutes(db));
   for (const path of ['/api/tasks/*','/api/keys/*','/api/summary','/api/reminders','/api/reminders/*','/api/notifications/*']) app.use(path,session);
   app.route('/api/tasks',taskRoutes(db));
+  app.route('/api/tasks',taskCommentRoutes(db));
   app.route('/api/keys',keyRoutes(db));
   app.get('/api/summary',async c => {
     const projectId=c.req.query('project_id');

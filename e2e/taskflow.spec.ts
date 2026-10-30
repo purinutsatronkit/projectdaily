@@ -28,6 +28,25 @@ test('ประวัติงานแสดงผู้แก้และก�
   await expect(dialog.getByText('สถานะ: ยังไม่เริ่ม → กำลังทำ')).toBeVisible();
   await expect(dialog.getByText('สร้างงาน')).toBeVisible();
 });
+test('คอมเมนต์งานและส่งข้อความพร้อมรูปในแชทส่วนตัว',async({page,request})=>{
+  const peer=`peer-${Date.now()}@example.test`;
+  expect((await request.post('/api/auth/register',{data:{name:'ผู้รับ',email:peer,password:'Test!2026'}})).status()).toBe(201);
+  await register(page);
+  await page.getByRole('button',{name:'เพิ่มงานใหม่'}).click();
+  const dialog=page.getByRole('dialog');await dialog.getByLabel(/ชื่องาน/).fill('งานคุยกัน');await dialog.getByRole('button',{name:'เพิ่มงาน',exact:true}).click();
+  await page.getByRole('button',{name:'แก้ไข งานคุยกัน'}).click();
+  await dialog.getByRole('button',{name:'คอมเมนต์และ @กล่าวถึง'}).click();
+  await dialog.getByLabel('เขียนคอมเมนต์').fill('ตรวจรายละเอียดแล้ว');await dialog.getByRole('button',{name:'ส่งคอมเมนต์'}).click();
+  await expect(dialog.getByText('ตรวจรายละเอียดแล้ว')).toBeVisible();
+  await dialog.getByRole('button',{name:'ยกเลิก'}).click();
+  await page.getByRole('button',{name:'ทีมและโค้ด'}).click();await page.getByRole('button',{name:'ข้อความส่วนตัว'}).click();
+  await page.getByLabel('อีเมลผู้รับ').fill(peer);await page.getByRole('button',{name:'เริ่มแชท'}).click();
+  await page.getByLabel('พิมพ์ข้อความส่วนตัว').fill('สวัสดีจาก Playwright');
+  await page.locator('input[type=file]').setInputFiles({name:'test.png',mimeType:'image/png',buffer:Buffer.from([137,80,78,71,13,10,26,10,1,2,3])});
+  await page.getByRole('button',{name:'ส่งข้อความ'}).click();
+  await expect(page.getByRole('paragraph').filter({hasText:'สวัสดีจาก Playwright'})).toBeVisible();
+  await expect(page.getByRole('img',{name:'test.png'})).toBeVisible();
+});
 test('เมนู Workspace เปิดปิดเป็นหมวดและเลือกหน้าที่ซ่อนไว้ได้',async({page})=>{
   await register(page);
   const records=page.getByRole('button',{name:'บันทึกและเอกสาร'});
@@ -74,6 +93,10 @@ test('เปิดบอร์ดทำงานร่วมกันและ�
   await page.getByPlaceholder('ชื่องานใหม่').fill('ตรวจงานทีม');
   await page.getByRole('button',{name:'เพิ่ม',exact:true}).click();
   await expect(page.getByText('ตรวจงานทีม')).toBeVisible();
+  await page.getByRole('button',{name:'GitHub Pull Request / Issue'}).click();
+  await page.getByLabel('ลิงก์ GitHub Issue หรือ Pull Request').fill('https://github.com/owner/repo/pull/12');
+  await page.getByRole('button',{name:'แนบ',exact:true}).click();
+  await expect(page.getByRole('link',{name:'Pull Request · owner/repo #12'})).toBeVisible();
 });
 
 test('สร้างงานและดูในปฏิทินเดือนที่เลือก', async ({ page }) => {

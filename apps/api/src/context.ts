@@ -17,7 +17,7 @@ export interface Config {
   clientIp?: (c: AppContext) => string;
 }
 export class ApiError extends Error {
-  constructor(public status: 400 | 401 | 403 | 404 | 409 | 415 | 429 | 500 | 503, public code: string, message: string) { super(message); }
+  constructor(public status: 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429 | 500 | 503, public code: string, message: string) { super(message); }
 }
 export async function parseBody<T>(c: AppContext, schema: z.ZodType<T>): Promise<T> {
   const mediaType = c.req.header('content-type')?.split(';')[0].trim().toLowerCase();

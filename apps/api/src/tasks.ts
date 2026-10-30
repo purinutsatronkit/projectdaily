@@ -5,6 +5,7 @@ import {z} from 'zod';
 import { ApiError, all, get, now, bangkokDate, parseBody, transaction, type Env } from './context.ts';
 import type { Database } from './db.ts';
 import {changedFields,recordTaskActivity,taskHistory,type TaskState} from './task-activity.ts';
+import {readableTask} from './task-comments.ts';
 
 export const TASK_COLUMNS = 'id,title,description,priority,status,due_date,project_id,created_at,updated_at';
 export const TASK_ORDER = "(status='completed'), (due_date IS NULL), due_date, CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, created_at DESC, id DESC";
@@ -59,22 +60,25 @@ export function taskRoutes(db: Database) {
   });
   routes.get('/:id/links',async c=>{
     const userId=c.get('user').id,id=c.req.param('id');
-    if(!await get(db,'SELECT id FROM tasks WHERE id=? AND user_id=?',id,userId))throw new ApiError(404,'NOT_FOUND','ไม่พบงานนี้');
-    return c.json({links:await all(db,'SELECT id,kind,repository,number,created_at FROM task_github_links WHERE task_id=? AND user_id=? ORDER BY created_at',id,userId)});
+    const task=await readableTask(db,id,userId);
+    return c.json({links:await all(db,'SELECT id,kind,repository,number,created_at FROM task_github_links WHERE task_id=? AND user_id=? ORDER BY created_at',id,task.user_id)});
   });
   routes.post('/:id/links',async c=>{
     const {url}=await parseBody(c,z.object({url:z.url().max(300)})),userId=c.get('user').id,id=c.req.param('id');
-    if(!await get(db,'SELECT id FROM tasks WHERE id=? AND user_id=?',id,userId))throw new ApiError(404,'NOT_FOUND','ไม่พบงานนี้');
+    const task=await readableTask(db,id,userId);
+    if(task.user_id!==userId&&!await get(db,"SELECT 1 FROM project_members WHERE project_id=? AND user_id=? AND role='editor'",task.project_id,userId))throw new ApiError(403,'READ_ONLY','คุณมีสิทธิ์อ่านโปรเจกต์นี้เท่านั้น');
     const link=new URL(url),parts=link.pathname.split('/').filter(Boolean);
     if(link.protocol!=='https:'||link.hostname!=='github.com'||link.username||link.password||link.search||link.hash||parts.length!==4||!['issues','pull'].includes(parts[2])||!/^[1-9]\d*$/.test(parts[3])||!parts.slice(0,2).every(v=>/^[A-Za-z0-9_.-]{1,100}$/.test(v)))throw new ApiError(400,'INVALID_GITHUB_LINK','ใช้ลิงก์ GitHub Issue หรือ Pull Request เท่านั้น');
     const number=Number(parts[3]);if(!Number.isSafeInteger(number))throw new ApiError(400,'INVALID_GITHUB_LINK','เลข Issue หรือ Pull Request ไม่ถูกต้อง');
     const linkId=randomUUID();
-    try{await db.prepare('INSERT INTO task_github_links VALUES(?,?,?,?,?,?,?)').run(linkId,userId,id,parts[2]==='issues'?'issue':'pull',`${parts[0]}/${parts[1]}`,number,now());}
+    try{await db.prepare('INSERT INTO task_github_links VALUES(?,?,?,?,?,?,?)').run(linkId,task.user_id,id,parts[2]==='issues'?'issue':'pull',`${parts[0]}/${parts[1]}`,number,now());}
     catch(error){if(String(error).includes('UNIQUE constraint'))throw new ApiError(409,'LINK_EXISTS','ลิงก์นี้อยู่ในงานแล้ว');throw error;}
     return c.json({link:await get(db,'SELECT id,kind,repository,number,created_at FROM task_github_links WHERE id=?',linkId)},201);
   });
   routes.delete('/:id/links/:linkId',async c=>{
-    const result=await db.prepare('DELETE FROM task_github_links WHERE id=? AND task_id=? AND user_id=?').run(c.req.param('linkId'),c.req.param('id'),c.get('user').id);
+    const task=await readableTask(db,c.req.param('id'),c.get('user').id);
+    if(task.user_id!==c.get('user').id&&!await get(db,"SELECT 1 FROM project_members WHERE project_id=? AND user_id=? AND role='editor'",task.project_id,c.get('user').id))throw new ApiError(403,'READ_ONLY','คุณมีสิทธิ์อ่านโปรเจกต์นี้เท่านั้น');
+    const result=await db.prepare('DELETE FROM task_github_links WHERE id=? AND task_id=? AND user_id=?').run(c.req.param('linkId'),task.id,task.user_id);
     if(!result.changes)throw new ApiError(404,'NOT_FOUND','ไม่พบลิงก์นี้');return c.body(null,204);
   });
   routes.delete('/:id', async c => {

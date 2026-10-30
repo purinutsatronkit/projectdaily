@@ -140,4 +140,45 @@ CREATE TABLE IF NOT EXISTS task_activity (
 );
 CREATE INDEX IF NOT EXISTS idx_task_activity_task ON task_activity(task_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_task_activity_project ON task_activity(project_id,created_at DESC);
-PRAGMA user_version = 11;
+CREATE TABLE IF NOT EXISTS task_comments (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+ author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ body TEXT NOT NULL CHECK(length(body) BETWEEN 1 AND 2000), created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id,created_at,id);
+CREATE TABLE IF NOT EXISTS task_comment_mentions (
+ comment_id TEXT NOT NULL REFERENCES task_comments(id) ON DELETE CASCADE,
+ user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ PRIMARY KEY(comment_id,user_id)
+);
+CREATE TABLE IF NOT EXISTS mention_notifications (
+ id TEXT PRIMARY KEY, comment_id TEXT NOT NULL REFERENCES task_comments(id) ON DELETE CASCADE,
+ user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at TEXT NOT NULL, read_at TEXT, UNIQUE(comment_id,user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_mention_unread ON mention_notifications(user_id,read_at,created_at);
+CREATE TABLE IF NOT EXISTS direct_conversations (
+ id TEXT PRIMARY KEY, user_low TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ user_high TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ CHECK(user_low<user_high),UNIQUE(user_low,user_high)
+);
+CREATE INDEX IF NOT EXISTS idx_conversations_low ON direct_conversations(user_low,updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_high ON direct_conversations(user_high,updated_at DESC);
+CREATE TABLE IF NOT EXISTS direct_messages (
+ id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES direct_conversations(id) ON DELETE CASCADE,
+ sender_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ body TEXT NOT NULL DEFAULT '' CHECK(length(body)<=4000),
+ created_at TEXT NOT NULL, read_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON direct_messages(conversation_id,created_at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_unread ON direct_messages(conversation_id,sender_id,read_at);
+CREATE TABLE IF NOT EXISTS direct_attachments (
+ id TEXT PRIMARY KEY, message_id TEXT NOT NULL UNIQUE REFERENCES direct_messages(id) ON DELETE CASCADE,
+ uploader_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ filename TEXT NOT NULL, media_type TEXT NOT NULL,
+ size INTEGER NOT NULL CHECK(size BETWEEN 1 AND 5242880), data BLOB NOT NULL,
+ created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_attachments_uploader ON direct_attachments(uploader_id);
+PRAGMA user_version = 12;
