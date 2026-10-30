@@ -28,12 +28,13 @@ export async function parseBody<T>(c: AppContext, schema: z.ZodType<T>): Promise
   if (!result.success) throw new ApiError(400, 'VALIDATION_ERROR', result.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง');
   return result.data;
 }
-export function get<T>(db: Database, sql: string, ...values: (string | number | null)[]) { return db.prepare(sql).get(...values) as T | undefined; }
-export function all<T>(db: Database, sql: string, ...values: (string | number | null)[]) { return db.prepare(sql).all(...values) as T[]; }
+export async function get<T>(db: Database, sql: string, ...values: (string | number | null)[]) { return await db.prepare(sql).get(...values) as T | undefined; }
+export async function all<T>(db: Database, sql: string, ...values: (string | number | null)[]) { return await db.prepare(sql).all(...values) as T[]; }
 export const now = () => new Date().toISOString();
 export const bangkokDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-export function transaction<T>(db: Database, work: () => T): T {
-  db.exec('BEGIN IMMEDIATE');
-  try { const result = work(); db.exec('COMMIT'); return result; }
-  catch (error) { db.exec('ROLLBACK'); throw error; }
+export async function transaction<T>(db: Database, work: () => Promise<T> | T): Promise<T> {
+  if ('transaction' in db) return db.transaction(async()=>await work());
+  await db.exec('BEGIN IMMEDIATE');
+  try { const result = await work(); await db.exec('COMMIT'); return result; }
+  catch (error) { await db.exec('ROLLBACK'); throw error; }
 }

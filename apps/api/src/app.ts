@@ -87,16 +87,16 @@ export function createApp(db: Database,config: Config) {
   for (const path of ['/api/tasks/*','/api/keys/*','/api/summary','/api/reminders','/api/reminders/*','/api/notifications/*']) app.use(path,session);
   app.route('/api/tasks',taskRoutes(db));
   app.route('/api/keys',keyRoutes(db));
-  app.get('/api/summary',c => {
+  app.get('/api/summary',async c => {
     const projectId=c.req.query('project_id');
-    if(projectId&&projectId!=='unassigned'&&!db.prepare('SELECT id FROM projects WHERE id=? AND user_id=?').get(projectId,c.get('user').id))throw new ApiError(404,'NOT_FOUND','ไม่พบโปรเจกต์นี้');
-    return c.json({summary:readSummary(db,c.get('user').id,projectId)});
+    if(projectId&&projectId!=='unassigned'&&!await db.prepare('SELECT id FROM projects WHERE id=? AND user_id=?').get(projectId,c.get('user').id))throw new ApiError(404,'NOT_FOUND','ไม่พบโปรเจกต์นี้');
+    return c.json({summary:await readSummary(db,c.get('user').id,projectId)});
   });
   app.route('/api/notifications',notificationRoutes(db));
-  app.get('/api/reminders',c => c.json({reminders:readReminders(db,c.get('user').id)}));
+  app.get('/api/reminders',async c => c.json({reminders:await readReminders(db,c.get('user').id)}));
   app.get('/api/reminders/settings',c=>c.json({available:config.dailyEmailEnabled!==false&&!!(config.passwordReset&&'sendTaskReminder'in config.passwordReset),verified:!!c.get('user').email_verified_at,schedule:'07:00 Asia/Bangkok'}));
   app.route('/api/integrations',integrationRoutes(db,config.production));
-  app.get('/api/health',c => { db.prepare('SELECT 1').get(); return c.json({status:'ok',service:'taskflow-api'}); });
+  app.get('/api/health',async c => { await db.prepare('SELECT 1').get(); return c.json({status:'ok',service:'taskflow-api'}); });
   app.notFound(c => c.json({error:{code:'NOT_FOUND',message:'ไม่พบเส้นทางนี้',request_id:c.get('requestId')}},404));
   app.onError((error,c) => {
     const status = error instanceof ApiError ? error.status : error instanceof HTTPException ? error.status : 500;

@@ -31,16 +31,16 @@ export function socialRoutes(db:Database,config:Config) {
   const routes=new Hono<Env>(),authenticate=sessionMiddleware(db,config),social=config.social;
   const enabled=(provider:'google'|'github')=>Boolean(social?.[provider]&&(provider!=='github'||social?.tokenKey));
   routes.get('/providers',c=>c.json({google:enabled('google'),github:enabled('github')}));
-  routes.get('/connections',authenticate,c=>c.json({accounts:all(db,'SELECT provider,login,updated_at FROM connected_accounts WHERE user_id=?',c.get('user').id),google:enabled('google'),github:enabled('github'),install_url:social?.github?.slug?`https://github.com/apps/${social.github.slug}/installations/new`:'https://github.com/settings/installations'}));
-  routes.delete('/connections/github',authenticate,c=>{db.prepare("DELETE FROM connected_accounts WHERE user_id=? AND provider='github'").run(c.get('user').id);return c.body(null,204);});
+  routes.get('/connections',authenticate,async c=>c.json({accounts:await all(db,'SELECT provider,login,updated_at FROM connected_accounts WHERE user_id=?',c.get('user').id),google:enabled('google'),github:enabled('github'),install_url:social?.github?.slug?`https://github.com/apps/${social.github.slug}/installations/new`:'https://github.com/settings/installations'}));
+  routes.delete('/connections/github',authenticate,async c=>{await db.prepare("DELETE FROM connected_accounts WHERE user_id=? AND provider='github'").run(c.get('user').id);return c.body(null,204);});
   async function begin(c:AppContext,provider:'google'|'github',link:boolean) {
     await parseBody(c,z.object({}));
     if(!enabled(provider)) throw new ApiError(503,'PROVIDER_DISABLED','ยังไม่ได้ตั้งค่าการเชื่อมต่อบริการนี้');
     // Keep the browser, cookie, and registered redirect URI on the same canonical host.
     if(c.req.header('origin')&&c.req.header('origin')!==social!.publicUrl) throw new ApiError(400,'OAUTH_ORIGIN','กรุณาเปิดเว็บผ่าน '+social!.publicUrl);
     const state=random(),browser=random(),verifier=random(),nonce=random();
-    db.prepare('DELETE FROM oauth_states WHERE expires_at<=?').run(now());
-    db.prepare('INSERT INTO oauth_states(state_hash,provider,browser_hash,user_id,session_id,verifier,nonce,expires_at) VALUES(?,?,?,?,?,?,?,?)')
+    await db.prepare('DELETE FROM oauth_states WHERE expires_at<=?').run(now());
+    await db.prepare('INSERT INTO oauth_states(state_hash,provider,browser_hash,user_id,session_id,verifier,nonce,expires_at) VALUES(?,?,?,?,?,?,?,?)')
       .run(digest(state),provider,digest(browser),link?c.get('user').id:null,link?c.get('sessionId'):null,verifier,nonce,new Date(Date.now()+600000).toISOString());
     setCookie(c,`taskflow_oauth_${provider}`,browser,{httpOnly:true,secure:!!config.production,sameSite:'Lax',path:`/api/auth/${provider}`,maxAge:600});
     const url=new URL(provider==='google'?'https://accounts.google.com/o/oauth2/v2/auth':'https://github.com/login/oauth/authorize');
@@ -58,15 +58,15 @@ export function socialRoutes(db:Database,config:Config) {
       if(!enabled(provider)) throw new Error('Disabled');
       const state=c.req.query('state')??'',browser=getCookie(c,`taskflow_oauth_${provider}`)??'';
       if(!state||!browser) throw new Error('Missing state');
-      const pending=get<State>(db,'SELECT user_id,session_id,verifier,nonce,browser_hash FROM oauth_states WHERE state_hash=? AND provider=? AND expires_at>?',digest(state),provider,now());
+      const pending=await get<State>(db,'SELECT user_id,session_id,verifier,nonce,browser_hash FROM oauth_states WHERE state_hash=? AND provider=? AND expires_at>?',digest(state),provider,now());
       if(!pending||pending.browser_hash!==digest(browser)) throw new Error('Invalid state');
-      db.prepare('DELETE FROM oauth_states WHERE state_hash=?').run(digest(state));
+      await db.prepare('DELETE FROM oauth_states WHERE state_hash=?').run(digest(state));
       deleteCookie(c,`taskflow_oauth_${provider}`,{path:`/api/auth/${provider}`,secure:!!config.production,sameSite:'Lax'});
       async function validateLink() {
         if(!pending!.user_id) return;
         const payload=await verifyToken(getCookie(c,'taskflow_session')??'',config.secret);
-        if(payload.sub!==pending!.user_id||payload.sid!==pending!.session_id||!get(db,'SELECT id FROM auth_sessions WHERE id=? AND user_id=? AND revoked_at IS NULL AND expires_at>?',pending!.session_id!,pending!.user_id,now())) throw new Error('Session changed');
-        if(config.production&&readUser(db,pending!.user_id).email==='demo@taskflow.local') throw new Error('Demo disabled');
+        if(payload.sub!==pending!.user_id||payload.sid!==pending!.session_id||!await get(db,'SELECT id FROM auth_sessions WHERE id=? AND user_id=? AND revoked_at IS NULL AND expires_at>?',pending!.session_id!,pending!.user_id,now())) throw new Error('Session changed');
+        if(config.production&&(await readUser(db,pending!.user_id)).email==='demo@taskflow.local') throw new Error('Demo disabled');
       }
       await validateLink();
       if(c.req.query('error')) return c.redirect(`${destination}/?oauth_error=cancelled`);
@@ -85,26 +85,26 @@ export function socialRoutes(db:Database,config:Config) {
         identity={sub:String(user.id),name:user.login};
       }
       await validateLink(); // Session may have been revoked during the provider requests.
-      const userId=transaction(db,()=>{
-        const existing=get<{user_id:string}>(db,'SELECT user_id FROM connected_accounts WHERE provider=? AND subject=?',provider,identity.sub);
+      const userId=await transaction(db,async ()=>{
+        const existing=await get<{user_id:string}>(db,'SELECT user_id FROM connected_accounts WHERE provider=? AND subject=?',provider,identity.sub);
         if(pending.user_id&&existing&&existing.user_id!==pending.user_id) throw new ApiError(409,'ALREADY_LINKED','บัญชีนี้เชื่อมกับผู้ใช้อื่นแล้ว');
         let id=pending.user_id??existing?.user_id;
         if(!id) {
           if(provider!=='google'||!identity.email) throw new Error('Login unavailable');
           // Never silently link by email: the existing owner must authenticate first.
-          if(get(db,'SELECT id FROM users WHERE email=?',identity.email)) throw new ApiError(409,'LINK_REQUIRED','เข้าสู่บัญชีเดิมก่อน แล้วเชื่อม Google ในตั้งค่าบัญชี');
+          if(await get(db,'SELECT id FROM users WHERE email=?',identity.email)) throw new ApiError(409,'LINK_REQUIRED','เข้าสู่บัญชีเดิมก่อน แล้วเชื่อม Google ในตั้งค่าบัญชี');
           id=randomUUID();
-          db.prepare('INSERT INTO users(id,name,email,password_hash,created_at,email_verified_at) VALUES(?,?,?,?,?,?)').run(id,identity.name.trim().slice(0,80)||'Google user',identity.email,'oauth-only',now(),now());
+          await db.prepare('INSERT INTO users(id,name,email,password_hash,created_at,email_verified_at) VALUES(?,?,?,?,?,?)').run(id,identity.name.trim().slice(0,80)||'Google user',identity.email,'oauth-only',now(),now());
         }
-        const previous=get<{subject:string}>(db,'SELECT subject FROM connected_accounts WHERE user_id=? AND provider=?',id,provider);
+        const previous=await get<{subject:string}>(db,'SELECT subject FROM connected_accounts WHERE user_id=? AND provider=?',id,provider);
         if(previous&&previous.subject!==identity.sub) throw new ApiError(409,'ALREADY_LINKED','มีบัญชีที่เชื่อมไว้แล้ว');
         const cipher=provider==='github'?seal(tokenPayload(token),social!.tokenKey!,id):null;
-        if(provider==='google'&&identity.email){db.prepare('UPDATE users SET email_verified_at=COALESCE(email_verified_at,?) WHERE id=? AND email=?').run(now(),id,identity.email);}
-        db.prepare('INSERT INTO connected_accounts(user_id,provider,subject,login,token_cipher,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,provider) DO UPDATE SET login=excluded.login,token_cipher=excluded.token_cipher,updated_at=excluded.updated_at')
+        if(provider==='google'&&identity.email){await db.prepare('UPDATE users SET email_verified_at=COALESCE(email_verified_at,?) WHERE id=? AND email=?').run(now(),id,identity.email);}
+        await db.prepare('INSERT INTO connected_accounts(user_id,provider,subject,login,token_cipher,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,provider) DO UPDATE SET login=excluded.login,token_cipher=excluded.token_cipher,updated_at=excluded.updated_at')
           .run(id,provider,identity.sub,provider==='google'?identity.email!:identity.name,cipher,now());
         return id;
       });
-      if(!pending.user_id) await startSession(db,config,c,readUser(db,userId));
+      if(!pending.user_id) await startSession(db,config,c,await readUser(db,userId));
       return c.redirect(`${destination}/?oauth=${provider}-${pending.user_id?'connected':'login'}`);
     } catch(err) {
       const reason=err instanceof ApiError&&err.code==='LINK_REQUIRED'?'link_required':err instanceof ApiError&&err.code==='ALREADY_LINKED'?'already_linked':'failed';

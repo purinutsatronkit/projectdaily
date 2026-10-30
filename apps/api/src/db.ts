@@ -24,4 +24,4 @@ export function openDatabase(path: string) {
   db.exec('PRAGMA user_version = 10;');
   return db;
 }
-export type Database = ReturnType<typeof openDatabase>;
+export type Database = ReturnType<typeof openDatabase> | import('./turso-db.ts').TursoDatabase;

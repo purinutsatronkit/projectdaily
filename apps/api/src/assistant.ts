@@ -57,23 +57,23 @@ export function assistantRoutes(db:Database,options:{key?:string;model?:string;f
     if(action?.type==='link_github_issue'&&!message.includes(action.url))return c.json({reply:'กรุณาใส่ลิงก์ GitHub Issue หรือ Pull Request ที่ต้องการผูกกับงาน',action:null});
     const userId=c.get('user').id;
     if(action?.type==='summary'){
-      const row=get<{total:number;completed:number;overdue:number}>(db,"SELECT COUNT(*) total,COALESCE(SUM(status='completed'),0) completed,COALESCE(SUM(status!='completed' AND due_date<?),0) overdue FROM tasks WHERE user_id=?",bangkokDate(),userId)!;
+      const row=(await get<{total:number;completed:number;overdue:number}>(db,"SELECT COUNT(*) total,COALESCE(SUM(status='completed'),0) completed,COALESCE(SUM(status!='completed' AND due_date<?),0) overdue FROM tasks WHERE user_id=?",bangkokDate(),userId))!;
       return c.json({reply:`มีงานทั้งหมด ${row.total} งาน เสร็จแล้ว ${row.completed} งาน และเลยกำหนด ${row.overdue} งาน`,action:null});
     }
     if(action?.type==='list_tasks'){
-      const rows=all<{title:string;due_date:string|null;status:string}>(db,"SELECT title,due_date,status FROM tasks WHERE user_id=? AND (?='' OR instr(lower(title),lower(?))>0) ORDER BY due_date LIMIT 20",userId,action.search??'',action.search??'');
+      const rows=await all<{title:string;due_date:string|null;status:string}>(db,"SELECT title,due_date,status FROM tasks WHERE user_id=? AND (?='' OR instr(lower(title),lower(?))>0) ORDER BY due_date LIMIT 20",userId,action.search??'',action.search??'');
       return c.json({reply:rows.length?rows.map(t=>`${t.title}${t.due_date?` (${t.due_date})`:''} · ${t.status}`).join('\n'):'ไม่พบงานที่ตรงกับคำค้นหา',action:null});
     }
     const resolvedFields:Record<string,string>={};
     if(action&&'target'in action){
       const table=action.type.endsWith('task')||action.type==='link_github_issue'?'tasks':'projects';
       const column=table==='tasks'?'title':'name';
-      const matches=all<{id:string}>(db,`SELECT id FROM ${table} WHERE user_id=? AND lower(${column})=lower(?) LIMIT 2`,userId,action.target);
+      const matches=await all<{id:string}>(db,`SELECT id FROM ${table} WHERE user_id=? AND lower(${column})=lower(?) LIMIT 2`,userId,action.target);
       if(matches.length!==1)return c.json({reply:matches.length?'มีชื่อซ้ำกัน กรุณาแก้ในหน้ารายการ':'ไม่พบรายการชื่อนี้ กรุณาตรวจชื่อให้ตรง',action:null});
       resolvedFields.id=matches[0].id;
     }
     if(action&&'project_name'in action&&action.project_name){
-      const matches=all<{id:string}>(db,'SELECT id FROM projects WHERE user_id=? AND lower(name)=lower(?) LIMIT 2',userId,action.project_name);
+      const matches=await all<{id:string}>(db,'SELECT id FROM projects WHERE user_id=? AND lower(name)=lower(?) LIMIT 2',userId,action.project_name);
       if(matches.length!==1)return c.json({reply:'ไม่พบโปรเจกต์ชื่อนี้ หรือมีชื่อซ้ำ กรุณาระบุให้ชัดเจน',action:null});
       resolvedFields.project_id=matches[0].id;
     }

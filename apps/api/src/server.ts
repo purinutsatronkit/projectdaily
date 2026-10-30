@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { openDatabase } from './db.ts';
+import { openTursoDatabase } from './turso-db.ts';
 import { createApp } from './app.ts';
 import { resetEmailFromEnvironment } from './mail.ts';
 import { clientIp, trustedProxyIps } from './client-ip.ts';
@@ -18,7 +19,10 @@ const passwordReset = resetEmailFromEnvironment();
 const dailyEmailEnabled=process.env.EMAIL_REMINDERS_ENABLED!=='false';
 if (!passwordReset) console.warn('Password reset email is not configured. Set SMTP_USER and SMTP_PASS in .env; see docs/password-reset-gmail.md');
 if (production && !process.env.APP_ORIGIN?.startsWith('https://')) throw new Error('Production APP_ORIGIN must use HTTPS.');
-const db = openDatabase(resolve(root,process.env.DATABASE_PATH ?? './data/taskflow.sqlite'));
+if (production && (!/^(libsql|https):\/\/[^/]+$/.test(process.env.TURSO_DATABASE_URL?.trim() ?? '') || !process.env.TURSO_AUTH_TOKEN?.trim())) throw new Error('Production requires a remote TURSO_DATABASE_URL and TURSO_AUTH_TOKEN');
+const db = process.env.TURSO_DATABASE_URL
+  ? await openTursoDatabase(process.env.TURSO_DATABASE_URL.trim(),process.env.TURSO_AUTH_TOKEN?.trim() ?? '')
+  : openDatabase(resolve(root,process.env.DATABASE_PATH ?? './data/taskflow.sqlite'));
 const app = createApp(db,{secret:process.env.JWT_SECRET ?? '',production,passwordReset,dailyEmailEnabled,social:socialFromEnvironment(),
   assistant:{key:process.env.GEMINI_API_KEY?.trim(),model:process.env.GEMINI_MODEL?.trim()||undefined},
   origins:[process.env.APP_ORIGIN ?? 'http://localhost:5173',...(!production ? [
