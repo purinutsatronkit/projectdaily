@@ -74,6 +74,7 @@ export function createApp(db: Database,config: Config) {
   app.route('/api/focus',focusRoutes(db));
   app.use('/api/assistant/*',session);
   app.use('/api/assistant/plan',rateLimit('assistant',30,'ถาม AI บ่อยเกินไป กรุณารอสักครู่'));
+  app.use('/api/assistant/journal-suggestion',rateLimit('assistant',30,'ถาม AI บ่อยเกินไป กรุณารอสักครู่'));
   app.route('/api/assistant',assistantRoutes(db,config.assistant));
   app.use('/api/account',session);
   app.use('/api/account/*',session);
