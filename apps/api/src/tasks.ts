@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 import { taskSchema, taskUpdateSchema, statuses, priorities, dateSchema, type Task, type Summary } from '@taskflow/shared';
 import {z} from 'zod';
-import { ApiError, all, get, now, bangkokDate, parseBody, type Env } from './context.ts';
+import { ApiError, all, get, now, bangkokDate, parseBody, transaction, type Env } from './context.ts';
 import type { Database } from './db.ts';
+import {changedFields,recordTaskActivity,taskHistory,type TaskState} from './task-activity.ts';
 
 export const TASK_COLUMNS = 'id,title,description,priority,status,due_date,project_id,created_at,updated_at';
 export const TASK_ORDER = "(status='completed'), (due_date IS NULL), due_date, CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, created_at DESC, id DESC";
@@ -28,8 +29,11 @@ export function taskRoutes(db: Database) {
     const body = await parseBody(c, taskSchema);
     const id = randomUUID(), timestamp = now(), userId = c.get('user').id;
     if(body.project_id&&!await get(db,'SELECT id FROM projects WHERE id=? AND user_id=?',body.project_id,userId))throw new ApiError(400,'PROJECT_NOT_FOUND','ไม่พบโปรเจกต์นี้');
-    await db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,project_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
-      .run(id,userId,body.title,body.description,body.priority,body.status,body.due_date,body.project_id,timestamp,timestamp);
+    await transaction(db,async()=>{
+      await db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,project_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+        .run(id,userId,body.title,body.description,body.priority,body.status,body.due_date,body.project_id,timestamp,timestamp);
+      await recordTaskActivity(db,{id,user_id:userId,...body,assigned_to:null},userId,'created');
+    });
     return c.json({ task: await get<Task>(db, `SELECT ${TASK_COLUMNS} FROM tasks WHERE id=? AND user_id=?`, id,userId) }, 201);
   });
   routes.get('/:id', async c => {
@@ -37,15 +41,20 @@ export function taskRoutes(db: Database) {
     if (!task) throw new ApiError(404, 'NOT_FOUND', 'ไม่พบงานนี้');
     return c.json({ task });
   });
+  routes.get('/:id/history',async c=>c.json({history:await taskHistory(db,c.req.param('id'),c.get('user').id)}));
   routes.patch('/:id', async c => {
     const body = await parseBody(c, taskUpdateSchema);
     const userId = c.get('user').id, id = c.req.param('id');
-    const current = await get<Task>(db, `SELECT ${TASK_COLUMNS} FROM tasks WHERE id=? AND user_id=?`, id,userId);
+    const current = await get<TaskState>(db, 'SELECT id,user_id,title,description,priority,status,due_date,project_id,assigned_to FROM tasks WHERE id=? AND user_id=?', id,userId);
     if (!current) throw new ApiError(404, 'NOT_FOUND', 'ไม่พบงานนี้');
     const updated = { ...current, ...body };
     if(updated.project_id&&!await get(db,'SELECT id FROM projects WHERE id=? AND user_id=?',updated.project_id,userId))throw new ApiError(400,'PROJECT_NOT_FOUND','ไม่พบโปรเจกต์นี้');
-    await db.prepare('UPDATE tasks SET title=?,description=?,priority=?,status=?,due_date=?,project_id=?,updated_at=? WHERE id=? AND user_id=?')
-      .run(updated.title,updated.description,updated.priority,updated.status,updated.due_date,updated.project_id,now(),id,userId);
+    const changes=await changedFields(db,current,updated);
+    if(changes.length)await transaction(db,async()=>{
+      await db.prepare('UPDATE tasks SET title=?,description=?,priority=?,status=?,due_date=?,project_id=?,updated_at=? WHERE id=? AND user_id=?')
+        .run(updated.title,updated.description,updated.priority,updated.status,updated.due_date,updated.project_id,now(),id,userId);
+      await recordTaskActivity(db,updated,userId,'updated',changes);
+    });
     return c.json({ task: await get<Task>(db, `SELECT ${TASK_COLUMNS} FROM tasks WHERE id=? AND user_id=?`, id,userId) });
   });
   routes.get('/:id/links',async c=>{
@@ -69,8 +78,13 @@ export function taskRoutes(db: Database) {
     if(!result.changes)throw new ApiError(404,'NOT_FOUND','ไม่พบลิงก์นี้');return c.body(null,204);
   });
   routes.delete('/:id', async c => {
-    const result = await db.prepare('DELETE FROM tasks WHERE id=? AND user_id=?').run(c.req.param('id'),c.get('user').id);
-    if (!result.changes) throw new ApiError(404, 'NOT_FOUND', 'ไม่พบงานนี้');
+    const task=await get<TaskState>(db,'SELECT id,user_id,title,description,priority,status,due_date,project_id,assigned_to FROM tasks WHERE id=? AND user_id=?',c.req.param('id'),c.get('user').id);
+    if(!task)throw new ApiError(404,'NOT_FOUND','ไม่พบงานนี้');
+    await transaction(db,async()=>{
+      const result=await db.prepare('DELETE FROM tasks WHERE id=? AND user_id=?').run(task.id,c.get('user').id);
+      if(!result.changes)throw new ApiError(404,'NOT_FOUND','ไม่พบงานนี้');
+      await recordTaskActivity(db,task,c.get('user').id,'deleted');
+    });
     return c.body(null,204);
   });
   routes.get('/sk09/suggestions',async c=>{

@@ -128,4 +128,16 @@ CREATE TABLE IF NOT EXISTS task_schedule (
  created_at TEXT NOT NULL,UNIQUE(user_id,task_id,plan_date)
 );
 CREATE INDEX IF NOT EXISTS idx_task_schedule_day ON task_schedule(user_id,plan_date,start_time);
-PRAGMA user_version = 10;
+CREATE TABLE IF NOT EXISTS task_activity (
+ id TEXT PRIMARY KEY, task_id TEXT NOT NULL,
+ owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+ actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+ actor_type TEXT NOT NULL DEFAULT 'user' CHECK(actor_type IN ('user','system')),
+ task_title TEXT NOT NULL,
+ event TEXT NOT NULL CHECK(event IN ('created','updated','deleted')),
+ changes TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_task_activity_task ON task_activity(task_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_task_activity_project ON task_activity(project_id,created_at DESC);
+PRAGMA user_version = 11;

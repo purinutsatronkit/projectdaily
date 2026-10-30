@@ -16,6 +16,18 @@ test('สมัครบัญชีและเปิดรายการง�
   await register(page);
   await expect(page.getByRole('heading', { name: 'รายการงาน' })).toBeVisible();
 });
+test('ประวัติงานแสดงผู้แก้และการเปลี่ยนสถานะ',async({page})=>{
+  await register(page);
+  await page.getByRole('button',{name:'เพิ่มงานใหม่'}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByLabel(/ชื่องาน/).fill('งานทดสอบประวัติ');
+  await dialog.getByRole('button',{name:'เพิ่มงาน',exact:true}).click();
+  await page.getByRole('combobox',{name:'เปลี่ยนสถานะของ งานทดสอบประวัติ'}).selectOption('in_progress');
+  await page.getByRole('button',{name:'แก้ไข งานทดสอบประวัติ'}).click();
+  await dialog.getByRole('button',{name:'ประวัติการเปลี่ยนแปลง'}).click();
+  await expect(dialog.getByText('สถานะ: ยังไม่เริ่ม → กำลังทำ')).toBeVisible();
+  await expect(dialog.getByText('สร้างงาน')).toBeVisible();
+});
 test('เมนู Workspace เปิดปิดเป็นหมวดและเลือกหน้าที่ซ่อนไว้ได้',async({page})=>{
   await register(page);
   const records=page.getByRole('button',{name:'บันทึกและเอกสาร'});

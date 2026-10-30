@@ -2,8 +2,9 @@ import {randomUUID} from 'node:crypto';
 import {Hono} from 'hono';
 import {z} from 'zod';
 import {taskSchema,taskUpdateSchema} from '@taskflow/shared';
-import {ApiError,all,get,now,parseBody,type Env} from './context.ts';
+import {ApiError,all,get,now,parseBody,transaction,type Env} from './context.ts';
 import type {Database} from './db.ts';
+import {changedFields,recordTaskActivity,type TaskState} from './task-activity.ts';
 
 const email=z.email().max(200);
 export function sharedProjectRoutes(db:Database){
@@ -21,6 +22,7 @@ export function sharedProjectRoutes(db:Database){
   routes.get('/:id',async c=>{const {project,role}=await access(c.req.param('id'),c.get('user').id);return c.json({project,role,
     members:await all(db,'SELECT u.id,u.name,u.email,m.role FROM project_members m JOIN users u ON u.id=m.user_id WHERE m.project_id=? ORDER BY m.created_at',project.id),
     tasks:await all(db,'SELECT t.id,t.title,t.description,t.priority,t.status,t.due_date,t.project_id,t.assigned_to,t.created_at,t.updated_at,u.name AS assignee_name FROM tasks t LEFT JOIN users u ON u.id=t.assigned_to WHERE t.project_id=? AND t.user_id=? ORDER BY (t.status=\'completed\'),(t.due_date IS NULL),t.due_date,t.created_at DESC LIMIT 500',project.id,project.user_id)});});
+  routes.get('/:id/activity',async c=>{const {project}=await access(c.req.param('id'),c.get('user').id);return c.json({history:await all(db,"SELECT a.id,a.task_id,a.task_title,a.event,a.changes,a.created_at,CASE WHEN a.actor_type='system' THEN 'ระบบ' ELSE COALESCE(NULLIF(u.nickname,''),u.name,'บัญชีที่ลบแล้ว') END actor_name FROM task_activity a LEFT JOIN users u ON u.id=a.actor_id WHERE a.project_id=? AND a.owner_id=? ORDER BY a.created_at DESC,a.id DESC LIMIT 100",project.id,project.user_id)});});
   routes.post('/:id/members',async c=>{
     const {email:address,role}=await parseBody(c,z.object({email,role:z.enum(['viewer','editor'])}));
     const {project}=await access(c.req.param('id'),c.get('user').id);
@@ -33,9 +35,13 @@ export function sharedProjectRoutes(db:Database){
   routes.delete('/:id/members/:userId',async c=>{
     const {project}=await access(c.req.param('id'),c.get('user').id),target=c.req.param('userId');
     if(project.user_id!==c.get('user').id&&target!==c.get('user').id)throw new ApiError(403,'OWNER_REQUIRED','ไม่มีสิทธิ์นำสมาชิกออก');
-    const change=await db.prepare('DELETE FROM project_members WHERE project_id=? AND user_id=?').run(project.id,target);
-    if(!change.changes)throw new ApiError(404,'NOT_FOUND','ไม่พบสมาชิกนี้');
-    await db.prepare('UPDATE tasks SET assigned_to=NULL WHERE project_id=? AND assigned_to=?').run(project.id,target);
+    await transaction(db,async()=>{
+      const assigned=await all<TaskState>(db,'SELECT id,user_id,title,description,priority,status,due_date,project_id,assigned_to FROM tasks WHERE project_id=? AND assigned_to=?',project.id,target);
+      const change=await db.prepare('DELETE FROM project_members WHERE project_id=? AND user_id=?').run(project.id,target);
+      if(!change.changes)throw new ApiError(404,'NOT_FOUND','ไม่พบสมาชิกนี้');
+      await db.prepare('UPDATE tasks SET assigned_to=NULL WHERE project_id=? AND assigned_to=?').run(project.id,target);
+      for(const task of assigned)await recordTaskActivity(db,{...task,assigned_to:null},c.get('user').id,'updated',await changedFields(db,task,{...task,assigned_to:null}));
+    });
     return c.body(null,204);
   });
   routes.post('/:id/tasks',async c=>{
@@ -43,17 +49,24 @@ export function sharedProjectRoutes(db:Database){
     const body=await parseBody(c,taskSchema.omit({project_id:true}).extend({assigned_to:z.uuid().nullable().default(null)}));
     if(body.assigned_to&&body.assigned_to!==project.user_id&&!await get(db,'SELECT 1 FROM project_members WHERE project_id=? AND user_id=?',project.id,body.assigned_to))throw new ApiError(400,'INVALID_ASSIGNEE','ผู้รับมอบหมายไม่อยู่ในโปรเจกต์');
     const id=randomUUID(),stamp=now();
-    await db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,project_id,created_at,updated_at,assigned_to) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(id,project.user_id,body.title,body.description,body.priority,body.status,body.due_date,project.id,stamp,stamp,body.assigned_to);
+    await transaction(db,async()=>{
+      await db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,project_id,created_at,updated_at,assigned_to) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(id,project.user_id,body.title,body.description,body.priority,body.status,body.due_date,project.id,stamp,stamp,body.assigned_to);
+      await recordTaskActivity(db,{id,user_id:project.user_id,title:body.title,description:body.description,priority:body.priority,status:body.status,due_date:body.due_date,project_id:project.id,assigned_to:body.assigned_to},c.get('user').id,'created');
+    });
     return c.json({task:await get(db,'SELECT id,title,description,priority,status,due_date,project_id,assigned_to,created_at,updated_at FROM tasks WHERE id=?',id)},201);
   });
   routes.patch('/:id/tasks/:taskId',async c=>{
     const {project,role}=await access(c.req.param('id'),c.get('user').id);requireEditor(role);
     const body=await parseBody(c,taskUpdateSchema.safeExtend({assigned_to:z.uuid().nullable().optional()}).refine(v=>v.project_id===undefined,{message:'ย้ายงานข้ามโปรเจกต์จากบอร์ดนี้ไม่ได้'}));
-    const current=await get<{title:string;description:string;priority:string;status:string;due_date:string|null;assigned_to:string|null}>(db,'SELECT title,description,priority,status,due_date,assigned_to FROM tasks WHERE id=? AND project_id=? AND user_id=?',c.req.param('taskId'),project.id,project.user_id);
+    const current=await get<TaskState>(db,'SELECT id,user_id,title,description,priority,status,due_date,project_id,assigned_to FROM tasks WHERE id=? AND project_id=? AND user_id=?',c.req.param('taskId'),project.id,project.user_id);
     if(!current)throw new ApiError(404,'NOT_FOUND','ไม่พบงานนี้');
     const next={...current,...body};
     if(next.assigned_to&&next.assigned_to!==project.user_id&&!await get(db,'SELECT 1 FROM project_members WHERE project_id=? AND user_id=?',project.id,next.assigned_to))throw new ApiError(400,'INVALID_ASSIGNEE','ผู้รับมอบหมายไม่อยู่ในโปรเจกต์');
-    await db.prepare('UPDATE tasks SET title=?,description=?,priority=?,status=?,due_date=?,assigned_to=?,updated_at=? WHERE id=? AND project_id=? AND user_id=?').run(next.title,next.description,next.priority,next.status,next.due_date,next.assigned_to,now(),c.req.param('taskId'),project.id,project.user_id);
+    const changes=await changedFields(db,current,next);
+    if(changes.length)await transaction(db,async()=>{
+      await db.prepare('UPDATE tasks SET title=?,description=?,priority=?,status=?,due_date=?,assigned_to=?,updated_at=? WHERE id=? AND project_id=? AND user_id=?').run(next.title,next.description,next.priority,next.status,next.due_date,next.assigned_to,now(),c.req.param('taskId'),project.id,project.user_id);
+      await recordTaskActivity(db,next,c.get('user').id,'updated',changes);
+    });
     return c.json({task:await get(db,'SELECT id,title,description,priority,status,due_date,project_id,assigned_to,created_at,updated_at FROM tasks WHERE id=?',c.req.param('taskId'))});
   });
   return routes;

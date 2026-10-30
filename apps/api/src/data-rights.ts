@@ -22,6 +22,7 @@ export function dataRightsRoutes(db:Database,config:Config){
       project_members:await all(db,'SELECT m.project_id,u.email,m.role,m.created_at FROM project_members m JOIN users u ON u.id=m.user_id JOIN projects p ON p.id=m.project_id WHERE p.user_id=?',userId),
       task_schedule:await all(db,'SELECT task_id,plan_date,start_time,end_time,created_at FROM task_schedule WHERE user_id=?',userId),
       tasks:await all(db,'SELECT id,title,description,priority,status,due_date,project_id,created_at,updated_at FROM tasks WHERE user_id=?',userId),
+      task_activity:await all(db,'SELECT task_id,task_title,event,changes,created_at,actor_type FROM task_activity WHERE owner_id=? ORDER BY created_at',userId),
       task_links:await all(db,'SELECT task_id,kind,repository,number,created_at FROM task_github_links WHERE user_id=?',userId),
       sk09_draft:await get<{data:string;version:number;updated_at:string}>(db,'SELECT data,version,updated_at FROM sk09_drafts WHERE user_id=?',userId)??null,
       task_notifications:await all(db,'SELECT task_id,notification_date,created_at,read_at FROM task_notifications WHERE user_id=?',userId),

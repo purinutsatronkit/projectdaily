@@ -22,6 +22,7 @@ import { GoogleSignIn } from './SocialAccounts';
 import GitHubWorkspace from './GitHubWorkspace';
 import Projects from './Projects';
 import TaskLinks from './TaskLinks';
+import TaskHistory from './TaskHistory';
 import VerifyEmailPage from './VerifyEmailPage';
 import AssistantChat from './AssistantChat';
 import WorkJournal from './WorkJournal';
@@ -229,6 +230,7 @@ function TaskForm({ task, initialDueDate, projects, selectedProject, onClose, on
     <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2"><label className="field-label">ความสำคัญ<select className="field mt-2" value={priority} onChange={e => setPriority(e.target.value as Task['priority'])} disabled={loading}>{Object.entries(PRIORITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="field-label">วันครบกำหนด<input name="due_date" type="date" className="field mt-2" value={dueDate} onInput={e => setDueDate(e.currentTarget.value)} onChange={e => setDueDate(e.target.value)} disabled={loading} /></label></div>
     <label className="field-label">โปรเจกต์<select className="field mt-2" value={projectId} onChange={e=>setProjectId(e.target.value)} disabled={loading}><option value="">ยังไม่จัดโปรเจกต์</option>{projects.map(project=><option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
     {task && <TaskLinks taskId={task.id}/>}
+    {task && <TaskHistory taskId={task.id}/>}
     {task && <label className="field-label">สถานะ<select className="field mt-2" value={status} onChange={e => setStatus(e.target.value as Task['status'])} disabled={loading}>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
     {error && <ErrorBox message={error} />}
     <div className="flex justify-end gap-3 border-t border-slate-100 pt-5"><button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>ยกเลิก</button><button className="btn-primary" disabled={loading}>{loading ? <Spinner small /> : <Check size={17} />}{task ? 'บันทึกการแก้ไข' : 'เพิ่มงาน'}</button></div>

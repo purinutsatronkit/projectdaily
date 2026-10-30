@@ -1,8 +1,9 @@
 import {randomUUID} from 'node:crypto';
 import {Hono} from 'hono';
 import {z} from 'zod';
-import {ApiError,all,get,now,parseBody,type Env} from './context.ts';
+import {ApiError,all,get,now,parseBody,transaction,type Env} from './context.ts';
 import type {Database} from './db.ts';
+import {changedFields,recordTaskActivity,type TaskState} from './task-activity.ts';
 
 const repository=z.string().regex(/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/).nullable();
 const projectSchema=z.object({name:z.string().trim().min(2).max(80),description:z.string().trim().max(500).default(''),github_repo:repository.default(null),notify_pipeline:z.boolean().default(true),follow_workflow_id:z.string().regex(/^[1-9]\d{0,18}$/).nullable().default(null),create_failure_tasks:z.boolean().default(false)});
@@ -30,8 +31,12 @@ export function projectRoutes(db:Database) {
     const userId=c.get('user').id,id=c.req.param('id');
     const current=await get(db,'SELECT id FROM projects WHERE id=? AND user_id=?',id,userId);
     if(!current)throw new ApiError(404,'NOT_FOUND','ไม่พบโปรเจกต์นี้');
-    await db.prepare('UPDATE tasks SET project_id=NULL,assigned_to=NULL WHERE user_id=? AND project_id=?').run(userId,id);
-    await db.prepare('DELETE FROM projects WHERE id=? AND user_id=?').run(id,userId);
+    await transaction(db,async()=>{
+      const tasks=await all<TaskState>(db,'SELECT id,user_id,title,description,priority,status,due_date,project_id,assigned_to FROM tasks WHERE user_id=? AND project_id=?',userId,id);
+      await db.prepare('UPDATE tasks SET project_id=NULL,assigned_to=NULL WHERE user_id=? AND project_id=?').run(userId,id);
+      for(const task of tasks)await recordTaskActivity(db,{...task,project_id:null,assigned_to:null},userId,'updated',await changedFields(db,task,{...task,project_id:null,assigned_to:null}));
+      await db.prepare('DELETE FROM projects WHERE id=? AND user_id=?').run(id,userId);
+    });
     return c.body(null,204);
   });
   return routes;

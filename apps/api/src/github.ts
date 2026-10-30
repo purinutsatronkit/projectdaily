@@ -5,6 +5,7 @@ import {ApiError,get,now,parseBody,type Config,type Env} from './context.ts';
 import {seal,unseal} from './social-config.ts';
 import {exchange,tokenPayload} from './social.ts';
 import type {Database} from './db.ts';
+import {recordTaskActivity} from './task-activity.ts';
 import {all} from './context.ts';
 
 const segment=z.string().min(1).max(100).regex(/^[A-Za-z0-9_.-]+$/).refine(v=>v!=='.'&&v!=='..');
@@ -76,7 +77,9 @@ export function githubRoutes(db:Database,config:Config) {
             if(inserted.changes&&project.create_failure_tasks){
               const taskTitle=`ตรวจ pipeline ล้มเหลว: ${title}`.slice(0,120);
               const description=`GitHub Actions ${project.github_repo} · Run #${runId}\nhttps://github.com/${project.github_repo}/actions/runs/${runId}`;
-              await db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,project_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(randomUUID(),userId,taskTitle,description,'high','pending',null,project.id,stamp,stamp);
+              const taskId=randomUUID();
+              await db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,project_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(taskId,userId,taskTitle,description,'high','pending',null,project.id,stamp,stamp);
+              await recordTaskActivity(db,{id:taskId,user_id:userId,title:taskTitle,description,priority:'high',status:'pending',due_date:null,project_id:project.id,assigned_to:null},null,'created');
             }
           }
         }
