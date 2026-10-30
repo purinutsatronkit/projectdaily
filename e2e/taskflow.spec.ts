@@ -16,10 +16,23 @@ test('สมัครบัญชีและเปิดรายการง�
   await register(page);
   await expect(page.getByRole('heading', { name: 'รายการงาน' })).toBeVisible();
 });
+test('เมนู Workspace เปิดปิดเป็นหมวดและเลือกหน้าที่ซ่อนไว้ได้',async({page})=>{
+  await register(page);
+  const records=page.getByRole('button',{name:'บันทึกและเอกสาร'});
+  await expect(records).toHaveAttribute('aria-expanded','false');
+  await expect(page.getByRole('button',{name:'บันทึกการทำงาน'})).toHaveCount(0);
+  await records.click();
+  await expect(records).toHaveAttribute('aria-expanded','true');
+  await page.getByRole('button',{name:'บันทึกการทำงาน'}).click();
+  await expect(page.getByRole('heading',{name:/บันทึกการทำงาน/})).toBeVisible();
+  await records.click();
+  await expect(page.getByRole('button',{name:'บันทึกการทำงาน'})).toHaveCount(0);
+});
 test('บันทึกงานรายวันแล้วนำไปร่าง สก.09',async({page})=>{
   await register(page);
+  await page.getByRole('button',{name:'บันทึกและเอกสาร'}).click();
   await page.getByRole('button',{name:'บันทึกการทำงาน'}).click();
-  await page.getByLabel('งานที่ทำ').fill('ตรวจโค้ดและแก้ไขบั๊ก');
+  await page.getByLabel('งานที่ทำ',{exact:true}).fill('ตรวจโค้ดและแก้ไขบั๊ก');
   await page.getByLabel('ผลลัพธ์ / สิ่งที่ได้เรียนรู้').fill('ทดสอบผ่าน');
   await page.getByRole('button',{name:'บันทึก',exact:true}).click();
   await expect(page.getByText('งาน: ตรวจโค้ดและแก้ไขบั๊ก')).toBeVisible();
@@ -43,6 +56,7 @@ test('เปิดบอร์ดทำงานร่วมกันและ�
   const dialog=page.getByRole('dialog',{name:'สร้างโปรเจกต์'});
   await dialog.getByLabel('ชื่อโปรเจกต์').fill('Shared board');
   await dialog.getByRole('button',{name:'บันทึก'}).click();
+  await page.getByRole('button',{name:'ทีมและโค้ด'}).click();
   await page.getByRole('button',{name:'ทำงานร่วมกัน'}).click();
   await page.getByRole('combobox',{name:'เลือกโปรเจกต์'}).selectOption({label:'Shared board'});
   await page.getByPlaceholder('ชื่องานใหม่').fill('ตรวจงานทีม');
@@ -78,12 +92,14 @@ test('สร้างโปรเจกต์แล้วเลือกงา�
 
 test('บันทึกร่าง สก.09 แล้วข้อมูลยังอยู่หลังรีโหลด', async ({ page }) => {
   await register(page);
+  await page.getByRole('button',{name:'บันทึกและเอกสาร'}).click();
   await page.getByRole('button', { name: 'บันทึก สก.09' }).click();
   await page.getByLabel('ชื่อ–สกุล').fill('ผู้ทดสอบ ระบบ');
   await page.getByLabel('รหัสนิสิต').fill('12345678');
   await page.getByRole('button', { name: 'บันทึกร่าง' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'บันทึกร่างแล้ว' })).toBeVisible();
   await page.reload();
+  await page.getByRole('button',{name:'บันทึกและเอกสาร'}).click();
   await page.getByRole('button', { name: 'บันทึก สก.09' }).click();
   await expect(page.getByLabel('ชื่อ–สกุล')).toHaveValue('ผู้ทดสอบ ระบบ');
   await expect(page.getByLabel('รหัสนิสิต')).toHaveValue('12345678');

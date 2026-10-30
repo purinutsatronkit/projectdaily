@@ -74,6 +74,13 @@ input:focus, select:focus, textarea:focus { border-color: #c92b35; box-shadow: 0
 .app-shell { display: flex; min-height: 100vh; }
 .sidebar { display: flex; flex-direction: column; width: 222px; flex-shrink: 0; border-right: 1px solid #e9dedb; background: #fffaf8f2; position: sticky; top: 0; height: 100vh; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 5px; }
+.nav-group { min-width: 0; }
+.nav-group-toggle { display: flex; width: 100%; align-items: center; gap: 10px; border-radius: 10px; padding: 11px 12px; text-align: left; color: #5f6878; font-size: 13px; font-weight: 700; transition: color .15s, background .15s; }
+.nav-group-toggle:hover, .nav-group-toggle.has-active { color: #a91f2e; background: #fff1ef80; }
+.nav-group-toggle:focus-visible, .nav-item:focus-visible { outline: 2px solid #a91f2e; outline-offset: 2px; }
+.nav-group-items { display: flex; flex-direction: column; gap: 3px; margin: 3px 0 8px 20px; padding-left: 9px; border-left: 1px solid #eadbd8; }
+.nav-group-items .nav-item { padding: 10px 9px; font-size: 13px; }
+.nav-guide { margin-top: 7px; border-top: 1px solid #eadbd8; border-radius: 0 0 10px 10px; }
 .nav-item { display: flex; align-items: center; gap: 11px; border-radius: 10px; padding: 12px; text-align: left; color: #748091; font-size: 14px; font-weight: 500; transition: color .15s, background .15s; }
 .nav-item:hover { color: #a91f2e; background: #fff1ef80; }
 .nav-item.active { background: #fbe6e3; color: #a91f2e; font-weight: 600; }
@@ -158,7 +165,10 @@ input:focus, select:focus, textarea:focus { border-color: #c92b35; box-shadow: 0
   .app-shell { display: block; }
   .sidebar { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid #e9dedb; }
   .sidebar > div:first-child { padding: 15px 20px; }
-  .sidebar-nav { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 9px; }
+  .sidebar-nav { flex-direction: column; gap: 2px; padding-bottom: 9px; }
+  .nav-group-toggle { min-height: 40px; padding: 9px 12px; }
+  .nav-group-items { flex-direction: row; gap: 4px; overflow-x: auto; margin: 2px 0 7px; padding: 2px 0 5px; border-left: 0; }
+  .nav-guide { margin-top: 2px; border-top: 0; }
   .nav-item { flex-shrink: 0; min-height: 40px; padding: 10px 12px; font-size: 13px; gap: 7px; }
   .workspace-header { height: 54px; padding: 0 20px; }
   .page-title { font-size: 30px; }

@@ -21,6 +21,21 @@ test('email configuration stays disabled until credentials exist and rejects uns
   assert.throws(() => resetEmailFromEnvironment({ SMTP_USER: 'bad-address', SMTP_PASS: 'not-real' }));
 });
 
+test('all email types use branded HTML, plain text, and escape user content', async () => {
+  const messages: {html?:string;text?:string;subject?:string}[]=[];
+  const transport={verify:async()=>true,sendMail:async(message:{html?:string;text?:string;subject?:string})=>{messages.push(message);return{accepted:['owner@example.test']};}};
+  const mail=createResetEmailService(transport as never,'https://tasks.example.test',{name:'TaskFlow',address:'sender@example.test'});
+  await mail.send({to:'owner@example.test',resetUrl:'https://tasks.example.test/reset-password#token=abc&next=1',expiresMinutes:5});
+  await mail.sendVerification!({to:'owner@example.test',verifyUrl:'https://tasks.example.test/verify-email#token=abc&next=1'});
+  await mail.sendTaskReminder({to:'owner@example.test',name:'<script>alert(1)</script>',date:'2026-10-30',tasks:[{title:'Report <urgent> & review',due_date:'2026-10-30',priority:'high'}]});
+  assert.equal(messages.length,3);
+  for(const message of messages){assert.match(message.html??'',/TaskFlow/);assert.match(message.html??'',/#a91f2e/);assert.ok(message.text?.length);}
+  assert.match(messages[0].html??'',/reset-password#token=abc&amp;next=1/);
+  assert.match(messages[1].html??'',/ยืนยันอีเมล/);
+  assert.match(messages[2].html??'',/Report &lt;urgent&gt; &amp; review/);
+  assert.doesNotMatch(messages[2].html??'',/<script>/);
+});
+
 test('password recovery sends a real message through local SMTP, then the received link resets the password', async t => {
   const received: { raw: string; to: string[] }[] = [];
   const server = new SMTPServer({
@@ -55,8 +70,9 @@ test('password recovery sends a real message through local SMTP, then the receiv
   for (let retry = 0; received.length < 2 && retry < 100; retry++) await delay(20);
   assert.equal(received.length, 2, 'The SMTP receiver must accept verification and reset messages');
   assert.ok(received.every(item=>item.to[0]==='owner@example.test'));
-  const resetMessage=received.find(item=>item.raw.includes('reset-password'));assert.ok(resetMessage);
-  const decoded = resetMessage.raw.replace(/=\r?\n/g, '').replace(/=3D/gi, '=');
+  const decodedMessages=received.map(item=>item.raw.replace(/=\r?\n/g, '').replace(/=3D/gi, '='));
+  const decoded=decodedMessages.find(message=>message.includes('reset-password'));
+  assert.ok(decoded);
   const resetUrl = decoded.match(/http:\/\/localhost:5173\/reset-password#token=[0-9a-f]{64}/)?.[0];
   assert.ok(resetUrl, 'The transmitted email must contain a complete usable reset link');
   const token = new URLSearchParams(new URL(resetUrl).hash.slice(1)).get('token')!;
