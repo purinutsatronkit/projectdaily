@@ -57,7 +57,7 @@ export function githubRoutes(db:Database,config:Config) {
   routes.get('/actions',c=>c.json({actions:all(db,'SELECT id,repository,action,target,created_at FROM pipeline_actions WHERE user_id=? ORDER BY created_at DESC LIMIT 50',c.get('user').id)}));
   routes.get('/alerts',async c=>{
     const userId=c.get('user').id;
-    const projects=all<{id:string;github_repo:string;follow_workflow_id:string|null}>(db,'SELECT id,github_repo,follow_workflow_id FROM projects WHERE user_id=? AND notify_pipeline=1 AND github_repo IS NOT NULL ORDER BY created_at LIMIT 10',userId);
+    const projects=all<{id:string;github_repo:string;follow_workflow_id:string|null;create_failure_tasks:number}>(db,'SELECT id,github_repo,follow_workflow_id,create_failure_tasks FROM projects WHERE user_id=? AND (notify_pipeline=1 OR create_failure_tasks=1) AND github_repo IS NOT NULL ORDER BY created_at LIMIT 10',userId);
     const connected=Boolean(read(userId));let failures=0;
     if(connected)for(const project of projects){
       const parts=project.github_repo.split('/');if(parts.length!==2||!parts.every(p=>segment.safeParse(p).success))continue;
@@ -71,7 +71,13 @@ export function githubRoutes(db:Database,config:Config) {
           const previous=get<{state:string}>(db,'SELECT state FROM pipeline_observations WHERE user_id=? AND repository=? AND run_id=?',userId,project.github_repo,runId);
           db.prepare('INSERT INTO pipeline_observations(user_id,repository,run_id,state) VALUES(?,?,?,?) ON CONFLICT(user_id,repository,run_id) DO UPDATE SET state=excluded.state').run(userId,project.github_repo,runId,state);
           if((previous?previous.state!==state:hadBaseline)&&run.status==='completed'&&['failure','timed_out','action_required'].includes(run.conclusion)){
-            db.prepare('INSERT OR IGNORE INTO pipeline_notifications VALUES(?,?,?,?,?,?,?,NULL)').run(randomUUID(),userId,project.id,project.github_repo,runId,String(run.display_title||run.name||'Pipeline').slice(0,120),now());
+            const stamp=now(),title=String(run.display_title||run.name||'Pipeline').slice(0,120);
+            const inserted=db.prepare('INSERT OR IGNORE INTO pipeline_notifications VALUES(?,?,?,?,?,?,?,NULL)').run(randomUUID(),userId,project.id,project.github_repo,runId,title,stamp);
+            if(inserted.changes&&project.create_failure_tasks){
+              const taskTitle=`ตรวจ pipeline ล้มเหลว: ${title}`.slice(0,120);
+              const description=`GitHub Actions ${project.github_repo} · Run #${runId}\nhttps://github.com/${project.github_repo}/actions/runs/${runId}`;
+              db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,project_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(randomUUID(),userId,taskTitle,description,'high','pending',null,project.id,stamp,stamp);
+            }
           }
         }
       }catch{failures++;}

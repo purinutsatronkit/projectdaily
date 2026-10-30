@@ -16,6 +16,39 @@ test('สมัครบัญชีและเปิดรายการง�
   await register(page);
   await expect(page.getByRole('heading', { name: 'รายการงาน' })).toBeVisible();
 });
+test('บันทึกงานรายวันแล้วนำไปร่าง สก.09',async({page})=>{
+  await register(page);
+  await page.getByRole('button',{name:'บันทึกการทำงาน'}).click();
+  await page.getByLabel('งานที่ทำ').fill('ตรวจโค้ดและแก้ไขบั๊ก');
+  await page.getByLabel('ผลลัพธ์ / สิ่งที่ได้เรียนรู้').fill('ทดสอบผ่าน');
+  await page.getByRole('button',{name:'บันทึก',exact:true}).click();
+  await expect(page.getByText('งาน: ตรวจโค้ดและแก้ไขบั๊ก')).toBeVisible();
+  await page.getByRole('button',{name:'นำไปร่าง สก.09'}).click();
+  await expect(page.getByRole('heading',{name:/บันทึกสหกิจศึกษา สก.09/})).toBeVisible();
+});
+test('วางเวลาทำงานในหน้าโฟกัส',async({page})=>{
+  await register(page);
+  await page.getByRole('button',{name:'เพิ่มงานใหม่'}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByLabel(/ชื่องาน/).fill('เตรียมรายงาน');
+  await dialog.getByRole('button',{name:'เพิ่มงาน',exact:true}).click();
+  await page.getByRole('button',{name:'วันนี้ควรทำอะไร'}).click();
+  await page.getByRole('combobox',{name:'งาน'}).selectOption({label:'เตรียมรายงาน'});
+  await page.getByRole('button',{name:'จัดเวลา'}).click();
+  await expect(page.getByText('09:00–10:00 · เตรียมรายงาน')).toBeVisible();
+});
+test('เปิดบอร์ดทำงานร่วมกันและเพิ่มงาน',async({page})=>{
+  await register(page);
+  await page.getByRole('button',{name:'สร้างโปรเจกต์'}).click();
+  const dialog=page.getByRole('dialog',{name:'สร้างโปรเจกต์'});
+  await dialog.getByLabel('ชื่อโปรเจกต์').fill('Shared board');
+  await dialog.getByRole('button',{name:'บันทึก'}).click();
+  await page.getByRole('button',{name:'ทำงานร่วมกัน'}).click();
+  await page.getByRole('combobox',{name:'เลือกโปรเจกต์'}).selectOption({label:'Shared board'});
+  await page.getByPlaceholder('ชื่องานใหม่').fill('ตรวจงานทีม');
+  await page.getByRole('button',{name:'เพิ่ม',exact:true}).click();
+  await expect(page.getByText('ตรวจงานทีม')).toBeVisible();
+});
 
 test('สร้างงานและดูในปฏิทินเดือนที่เลือก', async ({ page }) => {
   await register(page);

@@ -17,6 +17,9 @@ import {projectRoutes} from './projects.ts';
 import {verificationRoutes} from './email-verification.ts';
 import {assistantRoutes} from './assistant.ts';
 import {dataRightsRoutes} from './data-rights.ts';
+import {journalRoutes} from './journal.ts';
+import {sharedProjectRoutes} from './shared-projects.ts';
+import {focusRoutes} from './focus.ts';
 
 export function createApp(db: Database,config: Config) {
   if (config.secret.length < 32) throw new Error('JWT_SECRET must have at least 32 characters. Run npm run setup.');
@@ -63,6 +66,12 @@ export function createApp(db: Database,config: Config) {
   app.use('/api/projects',session);
   app.use('/api/projects/*',session);
   app.route('/api/projects',projectRoutes(db));
+  app.use('/api/shared-projects',session);
+  app.use('/api/shared-projects/*',session);
+  app.route('/api/shared-projects',sharedProjectRoutes(db));
+  app.use('/api/focus',session);
+  app.use('/api/focus/*',session);
+  app.route('/api/focus',focusRoutes(db));
   app.use('/api/assistant/*',session);
   app.use('/api/assistant/plan',rateLimit('assistant',30,'ถาม AI บ่อยเกินไป กรุณารอสักครู่'));
   app.route('/api/assistant',assistantRoutes(db,config.assistant));
@@ -72,6 +81,9 @@ export function createApp(db: Database,config: Config) {
   app.route('/api/account',dataRightsRoutes(db,config));
   app.use('/api/sk09/*',session);
   app.route('/api/sk09',sk09Routes(db));
+  app.use('/api/journal',session);
+  app.use('/api/journal/*',session);
+  app.route('/api/journal',journalRoutes(db));
   for (const path of ['/api/tasks/*','/api/keys/*','/api/summary','/api/reminders','/api/reminders/*','/api/notifications/*']) app.use(path,session);
   app.route('/api/tasks',taskRoutes(db));
   app.route('/api/keys',keyRoutes(db));

@@ -24,12 +24,6 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: APP_ORIGIN
-        fromService:
-          name: taskflow
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://projectdaily-hazel.vercel.app
       - key: APP_PUBLIC_URL
-        fromService:
-          name: taskflow
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://projectdaily-hazel.vercel.app

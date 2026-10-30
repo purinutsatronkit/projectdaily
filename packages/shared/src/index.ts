@@ -30,7 +30,7 @@ export const accountSchema = z.object({
 });
 export interface User { id: string; name: string; email: string; nickname?: string; phone?: string; avatar_url?: string | null; email_verified_at?: string|null }
 export interface Task { id: string; title: string; description: string; priority: typeof priorities[number]; status: typeof statuses[number]; due_date: string | null; project_id:string|null; created_at: string; updated_at: string }
-export interface Project {id:string;name:string;description:string;github_repo:string|null;notify_pipeline:number;follow_workflow_id:string|null;created_at:string;updated_at:string;task_count?:number}
+export interface Project {id:string;name:string;description:string;github_repo:string|null;notify_pipeline:number;follow_workflow_id:string|null;create_failure_tasks:number;created_at:string;updated_at:string;task_count?:number}
 export interface ApiKey { id: string; name: string; prefix: string; created_at: string; expires_at: string; revoked_at: string | null; last_used_at: string | null }
 export interface Summary { total: number; pending: number; in_progress: number; completed: number; overdue: number }
 export interface Reminder { id: string; task_id: string; task_title: string; notification_date: string; channel: string; created_at: string }

@@ -16,7 +16,11 @@ export function dataRightsRoutes(db:Database,config:Config){
     const user=get<{id:string;name:string;email:string;nickname:string;phone:string;email_verified_at:string|null;avatar:Uint8Array|null;avatar_type:string|null;created_at:string}>(db,'SELECT id,name,email,nickname,phone,email_verified_at,avatar,avatar_type,created_at FROM users WHERE id=?',userId)!;
     const {avatar,avatar_type,...profile}=user;
     const data={version:1,exported_at:new Date().toISOString(),profile:{...profile,avatar:avatar?{type:avatar_type,base64:Buffer.from(avatar).toString('base64')}:null},
-      projects:all(db,'SELECT id,name,description,github_repo,notify_pipeline,follow_workflow_id,created_at,updated_at FROM projects WHERE user_id=?',userId),
+      projects:all(db,'SELECT id,name,description,github_repo,notify_pipeline,follow_workflow_id,create_failure_tasks,created_at,updated_at FROM projects WHERE user_id=?',userId),
+      work_journal:all(db,'SELECT id,work_date,project_id,assignment,result,evidence_url,created_at,updated_at FROM work_journal WHERE user_id=?',userId),
+      project_memberships:all(db,'SELECT project_id,role,created_at FROM project_members WHERE user_id=?',userId),
+      project_members:all(db,'SELECT m.project_id,u.email,m.role,m.created_at FROM project_members m JOIN users u ON u.id=m.user_id JOIN projects p ON p.id=m.project_id WHERE p.user_id=?',userId),
+      task_schedule:all(db,'SELECT task_id,plan_date,start_time,end_time,created_at FROM task_schedule WHERE user_id=?',userId),
       tasks:all(db,'SELECT id,title,description,priority,status,due_date,project_id,created_at,updated_at FROM tasks WHERE user_id=?',userId),
       task_links:all(db,'SELECT task_id,kind,repository,number,created_at FROM task_github_links WHERE user_id=?',userId),
       sk09_draft:get<{data:string;version:number;updated_at:string}>(db,'SELECT data,version,updated_at FROM sk09_drafts WHERE user_id=?',userId)??null,

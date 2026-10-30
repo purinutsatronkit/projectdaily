@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw } from 'lucide-react';
 import { PRIORITY_LABELS, TASK_STATUS_LABELS, type Task } from '@taskflow/shared';
 import { bangkokToday, monthCalendar, shiftMonth } from './calendar-model';
 
@@ -9,8 +9,10 @@ export default function TaskCalendar({ tasks, loading, error, onRefresh, onSelec
   tasks:Task[];loading:boolean;error:string;onRefresh:()=>void;onSelect:(task:Task)=>void;onCreate:(date:string)=>void;
 }) {
   const [today,setToday]=useState(bangkokToday);
+  const [planned,setPlanned]=useState<{task_id:string;plan_date:string;start_time:string;end_time:string;title:string}[]>([]);
   const [selectedMonth,setSelectedMonth]=useState<string | null>(null);
   const month=selectedMonth ?? today.slice(0,7);
+  useEffect(()=>{const controller=new AbortController();const end=new Date(`${month}-01T12:00:00Z`);end.setUTCMonth(end.getUTCMonth()+1);end.setUTCDate(0);void fetch(`/api/focus?from=${month}-01&to=${end.toISOString().slice(0,10)}`,{credentials:'same-origin',signal:controller.signal}).then(r=>r.json()).then(v=>setPlanned(v.slots??[])).catch(()=>{});return()=>controller.abort();},[month,loading]);
   const [yearInput,setYearInput]=useState(()=>String(Number(bangkokToday().slice(0,4))+543));
   const currentMonth=month===today.slice(0,7);
   useEffect(()=>{const timer=window.setInterval(()=>setToday(bangkokToday()),60000); return ()=>window.clearInterval(timer);},[]);
@@ -33,7 +35,7 @@ export default function TaskCalendar({ tasks, loading, error, onRefresh, onSelec
           <thead><tr>{['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'].map(day=><th key={day} scope="col">{day}</th>)}</tr></thead>
           <tbody>{Array.from({length:cells.length/7},(_,week)=><tr key={week}>{cells.slice(week*7,week*7+7).map((cell,index)=>!cell?<td key={`blank-${index}`} className="calendar-blank" aria-label="นอกเดือนที่แสดง"/>:<td key={cell.date} className={cell.date===today?'calendar-today':''}>
             <div className="calendar-day-header"><time dateTime={cell.date} aria-current={cell.date===today?'date':undefined} className={cell.date===today?'calendar-today-number':''}>{cell.day}</time>{cell.date===today&&<span className="text-[10px] font-medium text-teal-700">วันนี้</span>}<button className="calendar-add" onClick={()=>onCreate(cell.date)} disabled={loading} aria-label={`เพิ่มงานวันที่ ${cell.day} ${monthLabel}`}><Plus size={14}/></button></div>
-            <div className="calendar-events">{!loading&&cell.tasks.map(task=><button key={task.id} className={`calendar-event calendar-event-${task.priority} ${task.status==='completed'?'calendar-event-done':''}`} onClick={()=>onSelect(task)} title={`${task.title} · ${PRIORITY_LABELS[task.priority]} · ${TASK_STATUS_LABELS[task.status]}`} aria-label={`${task.title} วันที่ ${cell.day} ${monthLabel} ความสำคัญ${PRIORITY_LABELS[task.priority]} ${TASK_STATUS_LABELS[task.status]}`}>
+            <div className="calendar-events">{planned.filter(slot=>slot.plan_date===cell.date).map(slot=><button key={slot.task_id+slot.start_time} className="calendar-event calendar-event-medium" title={`เวลาทำงาน ${slot.start_time}–${slot.end_time}: ${slot.title}`} onClick={()=>{const task=tasks.find(item=>item.id===slot.task_id);if(task)onSelect(task);}}><Clock3 size={12} className="inline"/> {slot.start_time} {slot.title}</button>)}{!loading&&cell.tasks.map(task=><button key={task.id} className={`calendar-event calendar-event-${task.priority} ${task.status==='completed'?'calendar-event-done':''}`} onClick={()=>onSelect(task)} title={`${task.title} · ${PRIORITY_LABELS[task.priority]} · ${TASK_STATUS_LABELS[task.status]}`} aria-label={`${task.title} วันที่ ${cell.day} ${monthLabel} ความสำคัญ${PRIORITY_LABELS[task.priority]} ${TASK_STATUS_LABELS[task.status]}`}>
               <span className="flex items-start gap-1">{task.status==='completed'&&<Check size={12} className="mt-0.5 shrink-0"/>}<span className="min-w-0 break-words">{task.title}</span></span>{task.status!=='completed'&&task.due_date!<today&&<span className="mt-1 block text-[10px] font-medium text-red-700">เลยกำหนด</span>}
             </button>)}</div>
           </td>)}</tr>)}</tbody>

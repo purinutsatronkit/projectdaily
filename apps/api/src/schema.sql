@@ -77,9 +77,17 @@ CREATE TABLE IF NOT EXISTS projects (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  name TEXT NOT NULL CHECK(length(name) BETWEEN 2 AND 80), description TEXT NOT NULL DEFAULT '',
  github_repo TEXT, notify_pipeline INTEGER NOT NULL DEFAULT 1 CHECK(notify_pipeline IN (0,1)),
- follow_workflow_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+ follow_workflow_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ create_failure_tasks INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id,created_at);
+CREATE TABLE IF NOT EXISTS project_members (
+ project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+ user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ role TEXT NOT NULL CHECK(role IN ('viewer','editor')),
+ created_at TEXT NOT NULL,PRIMARY KEY(project_id,user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id,project_id);
 CREATE TABLE IF NOT EXISTS task_github_links (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -106,4 +114,18 @@ CREATE TABLE IF NOT EXISTS email_verifications (
  expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_email_verifications_user ON email_verifications(user_id,created_at);
-PRAGMA user_version = 6;
+CREATE TABLE IF NOT EXISTS work_journal (
+ id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ work_date TEXT NOT NULL, project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+ assignment TEXT NOT NULL DEFAULT '', result TEXT NOT NULL DEFAULT '', evidence_url TEXT NOT NULL DEFAULT '',
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_work_journal_user_date ON work_journal(user_id,work_date);
+CREATE TABLE IF NOT EXISTS task_schedule (
+ id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+ plan_date TEXT NOT NULL,start_time TEXT NOT NULL,end_time TEXT NOT NULL,
+ created_at TEXT NOT NULL,UNIQUE(user_id,task_id,plan_date)
+);
+CREATE INDEX IF NOT EXISTS idx_task_schedule_day ON task_schedule(user_id,plan_date,start_time);
+PRAGMA user_version = 10;

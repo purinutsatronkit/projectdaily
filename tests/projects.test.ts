@@ -64,3 +64,52 @@ test('account deletion requires password and explicit confirmation, then cascade
   assert.equal((await f.request('/api/auth/me',other.cookie)).status,200);
   assert.equal(f.db.prepare('SELECT COUNT(*) count FROM projects').get()!.count,0);
 });
+test('journal entries stay private, feed a reviewed weekly report and export',async t=>{
+  const f=fixture(t),owner=await f.register('journal-owner@example.com'),other=await f.register('journal-other@example.com');
+  const project=(await (await f.request('/api/projects',owner.cookie,'POST',{name:'Internship'})).json()).project;
+  const body={work_date:'2026-10-26',project_id:project.id,assignment:'Review code',result:'Fixed tests',evidence_url:'https://github.com/owner/repo/pull/12'};
+  const created=await f.request('/api/journal',owner.cookie,'POST',body);assert.equal(created.status,201);
+  const id=(await created.json()).entry.id;
+  assert.equal((await f.request('/api/journal',other.cookie,'POST',body)).status,404);
+  assert.equal((await (await f.request('/api/journal?from=2026-10-26&to=2026-11-01',other.cookie)).json()).entries.length,0);
+  assert.equal((await f.request(`/api/journal/${id}`,other.cookie,'PATCH',body)).status,404);
+  assert.equal((await (await f.request('/api/journal/weekly?start=2026-10-26',owner.cookie)).json()).entries[0].result,'Fixed tests');
+  assert.equal((await (await f.request('/api/account/export',owner.cookie)).json()).work_journal.length,1);
+  assert.equal((await f.request(`/api/journal/${id}`,owner.cookie,'DELETE')).status,204);
+});
+test('pipeline failure creates one task only when project opts in',async t=>{
+  const f=fixture(t),owner=await f.register('pipeline-task@example.com');
+  await f.request('/api/projects',owner.cookie,'POST',{name:'Pipeline',github_repo:'owner/repo',create_failure_tasks:true});
+  f.db.prepare('INSERT INTO connected_accounts VALUES(?,?,?,?,?,?)').run(owner.user.id,'github','9','owner',seal(JSON.stringify({access_token:'mock',expires_at:null}),key,owner.user.id),new Date().toISOString());
+  await f.request('/api/github/alerts',owner.cookie);
+  f.setRunStatus('completed');await f.request('/api/github/alerts',owner.cookie);await f.request('/api/github/alerts',owner.cookie);
+  const tasks=(await (await f.request('/api/tasks',owner.cookie)).json()).tasks;
+  assert.equal(tasks.length,1);assert.match(tasks[0].description,/actions\/runs\/101/);
+});
+test('shared project roles isolate tasks and control edits and assignment',async t=>{
+  const f=fixture(t),owner=await f.register('share-owner@example.com'),editor=await f.register('share-editor@example.com'),viewer=await f.register('share-viewer@example.com'),outsider=await f.register('share-outsider@example.com');
+  const id=(await (await f.request('/api/projects',owner.cookie,'POST',{name:'Shared work'})).json()).project.id;
+  assert.equal((await f.request(`/api/shared-projects/${id}`,outsider.cookie)).status,404);
+  assert.equal((await f.request(`/api/shared-projects/${id}/members`,owner.cookie,'POST',{email:editor.user.email,role:'editor'})).status,200);
+  assert.equal((await f.request(`/api/shared-projects/${id}/members`,owner.cookie,'POST',{email:viewer.user.email,role:'viewer'})).status,200);
+  assert.equal((await f.request(`/api/shared-projects/${id}/members`,editor.cookie,'POST',{email:outsider.user.email,role:'editor'})).status,403);
+  const task=await f.request(`/api/shared-projects/${id}/tasks`,editor.cookie,'POST',{title:'Review shared code',assigned_to:viewer.user.id});assert.equal(task.status,201);
+  const taskId=(await task.json()).task.id;
+  assert.equal((await f.request(`/api/shared-projects/${id}/tasks`,viewer.cookie,'POST',{title:'Cannot edit'})).status,403);
+  assert.equal((await f.request(`/api/shared-projects/${id}/tasks/${taskId}`,viewer.cookie,'PATCH',{status:'completed'})).status,403);
+  const changed=await f.request(`/api/shared-projects/${id}/tasks/${taskId}`,editor.cookie,'PATCH',{status:'completed'});assert.equal(changed.status,200,await changed.text());
+  assert.equal((await (await f.request(`/api/shared-projects/${id}`,viewer.cookie)).json()).tasks[0].status,'completed');
+  assert.equal((await f.request(`/api/shared-projects/${id}/members/${editor.user.id}`,owner.cookie,'DELETE')).status,204);
+  assert.equal((await f.request(`/api/shared-projects/${id}`,editor.cookie)).status,404);
+});
+test('focus schedule prevents overlaps and stays private',async t=>{
+  const f=fixture(t),owner=await f.register('focus-owner@example.com'),other=await f.register('focus-other@example.com');
+  const one=(await (await f.request('/api/tasks',owner.cookie,'POST',{title:'First task'})).json()).task.id;
+  const two=(await (await f.request('/api/tasks',owner.cookie,'POST',{title:'Second task'})).json()).task.id;
+  const slot={task_id:one,plan_date:'2026-10-30',start_time:'09:00',end_time:'10:00'};
+  assert.equal((await f.request('/api/focus',owner.cookie,'POST',slot)).status,200);
+  assert.equal((await f.request('/api/focus',other.cookie,'POST',slot)).status,404);
+  assert.equal((await f.request('/api/focus',owner.cookie,'POST',{...slot,task_id:two,start_time:'09:30',end_time:'10:30'})).status,409);
+  assert.equal((await (await f.request('/api/focus?date=2026-10-30',owner.cookie)).json()).slots.length,1);
+  assert.equal((await (await f.request('/api/focus?date=2026-10-30',other.cookie)).json()).slots.length,0);
+});
