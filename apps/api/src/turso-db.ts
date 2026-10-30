@@ -10,7 +10,12 @@ export async function openTursoDatabase(url:string,authToken:string){
   if(!authToken&&!url.startsWith('file:'))throw new Error('TURSO_AUTH_TOKEN is required');
   const client=createClient({url,authToken,intMode:'number'});
   const schema=readFileSync(new URL('./schema.sql',import.meta.url),'utf8');
-  await client.executeMultiple(schema.replace('PRAGMA journal_mode = WAL;',''));
+  // Turso's HTTP endpoint may reject the Hrana `sequence` request used by
+  // executeMultiple. Send each DDL statement through the ordinary execute API.
+  for (const statement of schema.split(';').map(part => part.trim()).filter(Boolean)) {
+    if (/^PRAGMA\s+(journal_mode|foreign_keys|user_version)\b/i.test(statement)) continue;
+    await client.execute(statement);
+  }
   const columns=async(table:string)=>new Set((await client.execute(`PRAGMA table_info(${table})`)).rows.map(row=>String(row.name)));
   const users=await columns('users');
   for(const [name,definition] of Object.entries({nickname:"TEXT NOT NULL DEFAULT ''",phone:"TEXT NOT NULL DEFAULT ''",avatar:'BLOB',avatar_type:'TEXT',avatar_version:'TEXT',email_verified_at:'TEXT'})){
@@ -31,7 +36,7 @@ export async function openTursoDatabase(url:string,authToken:string){
         async run(...args:Params){const result=await (active.getStore()??client).execute({sql,args});return{changes:result.rowsAffected};},
       };
     },
-    async exec(sql:string){await client.executeMultiple(sql);},
+    async exec(sql:string){for(const statement of sql.split(';').map(part=>part.trim()).filter(Boolean))await client.execute(statement);},
     async transaction<T>(work:()=>Promise<T>){
       const tx=await client.transaction('write');
       try{const value=await active.run(tx,work);await tx.commit();return value;}
