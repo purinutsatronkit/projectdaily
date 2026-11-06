@@ -45,8 +45,8 @@ export default function AssistantChat({user,draft,onNavigate,onChanged,onUserUpd
     setPending(null);onChanged();setEntries(previous=>[...previous,{role:'assistant',text:message}]);
   }catch(e){setError(e instanceof Error?e.message:'ทำรายการไม่สำเร็จ');}finally{setBusy(false);}}
   return <>
-    <button type="button" onClick={()=>setOpen(value=>!value)} className="fixed bottom-5 right-5 z-40 flex h-14 items-center gap-2 rounded-full bg-teal-700 px-5 text-sm font-semibold text-white shadow-xl hover:bg-teal-800" aria-label={open?'ปิดแชท AI':'เปิดแชท AI'} aria-expanded={open}><Bot size={22}/>ถาม AI</button>
-    {open&&<section aria-label="ผู้ช่วย AI" className="fixed bottom-24 right-3 z-40 flex h-[min(680px,calc(100dvh-120px))] w-[min(420px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-2xl sm:right-5">
+    <button type="button" onClick={()=>setOpen(value=>!value)} className="icon-button" aria-label={open?'ปิดแชท AI':'เปิดแชท AI'} aria-expanded={open} aria-controls="assistant-chat-panel" title="ถาม AI"><Bot size={22}/></button>
+    {open&&<section id="assistant-chat-panel" role="region" aria-label="ผู้ช่วย AI" className="fixed inset-0 z-50 flex h-dvh w-full flex-col overflow-hidden bg-white shadow-2xl sm:inset-auto sm:right-5 sm:top-[72px] sm:h-[min(680px,calc(100dvh-92px))] sm:w-[min(420px,calc(100vw-40px))] sm:rounded-2xl sm:border sm:border-teal-100">
       <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-4"><div><h2 className="font-semibold">ผู้ช่วย TaskFlow</h2><p className="mt-1 text-xs text-slate-500">พิมพ์สั่งงาน แล้วตรวจและยืนยันก่อนบันทึก</p></div><button type="button" className="icon-button" aria-label="ปิดแชท AI" onClick={()=>setOpen(false)}><X size={18}/></button></div>
       <div className="flex-1 space-y-3 overflow-y-auto p-4" aria-live="polite">
         {available===false&&<p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">ยังไม่ได้ตั้งค่า GEMINI_API_KEY บนเซิร์ฟเวอร์</p>}

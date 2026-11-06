@@ -41,6 +41,12 @@ test('คอมเมนต์งานและส่งข้อความ�
   await dialog.getByRole('button',{name:'ยกเลิก'}).click();
   await page.getByRole('button',{name:'ทีมและโค้ด'}).click();await page.getByRole('button',{name:'ข้อความส่วนตัว'}).click();
   await page.getByLabel('อีเมลผู้รับ').fill(peer);await page.getByRole('button',{name:'เริ่มแชท'}).click();
+  await page.getByRole('button',{name:'ดูโปรไฟล์'}).click();
+  const profile=page.getByRole('dialog',{name:'โปรไฟล์คู่สนทนา'});
+  await expect(profile.getByText(peer)).toBeVisible();
+  await profile.getByLabel('ชื่อเล่นในแชทของฉัน').fill('เพื่อนร่วมทีม');
+  await profile.getByRole('button',{name:'บันทึกชื่อเล่น'}).click();
+  await expect(page.getByRole('button',{name:'เพื่อนร่วมทีม'})).toBeVisible();
   await page.getByLabel('พิมพ์ข้อความส่วนตัว').fill('สวัสดีจาก Playwright');
   await page.locator('input[type=file]').setInputFiles({name:'test.png',mimeType:'image/png',buffer:Buffer.from([137,80,78,71,13,10,26,10,1,2,3])});
   await page.getByRole('button',{name:'ส่งข้อความ'}).click();
@@ -69,6 +75,25 @@ test('บันทึกงานรายวันแล้วนำไปร�
   await expect(page.getByText('งาน: ตรวจโค้ดและแก้ไขบั๊ก')).toBeVisible();
   await page.getByRole('button',{name:'นำไปร่าง สก.09'}).click();
   await expect(page.getByRole('heading',{name:/บันทึกสหกิจศึกษา สก.09/})).toBeVisible();
+});
+test('ล้างแบบฟอร์ม สก.09 แล้วร่างว่างยังอยู่หลังรีเฟรช',async({page})=>{
+  await register(page);
+  await page.getByRole('button',{name:'บันทึกและเอกสาร'}).click();
+  await page.getByRole('button',{name:'บันทึก สก.09'}).click();
+  await page.getByLabel('รหัสนิสิต').fill('12345678');
+  await page.getByLabel('งานที่ได้รับมอบหมาย วันที่ 1').fill('ตรวจงาน');
+  await expect(page.getByText(/บันทึกร่างแล้ว/)).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'ล้างข้อมูลทั้งแบบฟอร์ม'}).click();
+  await expect(page.getByLabel('รหัสนิสิต')).toBeEmpty();
+  await expect(page.getByLabel('งานที่ได้รับมอบหมาย วันที่ 1')).toBeEmpty();
+  await expect(page.getByText('มีการแก้ไขที่ยังไม่บันทึก')).toBeVisible();
+  await expect(page.getByText(/บันทึกร่างแล้ว/)).toBeVisible();
+  await page.reload();
+  await page.getByRole('button',{name:'บันทึกและเอกสาร'}).click();
+  await page.getByRole('button',{name:'บันทึก สก.09'}).click();
+  await expect(page.getByLabel('รหัสนิสิต')).toBeEmpty();
+  await expect(page.getByLabel('งานที่ได้รับมอบหมาย วันที่ 1')).toBeEmpty();
 });
 test('วางเวลาทำงานในหน้าโฟกัส',async({page})=>{
   await register(page);
@@ -171,8 +196,10 @@ test('หน้าจอมือถือไม่ล้นแนวนอน�
 
 test('แชท AI เสนอคำสั่งและบันทึกหลังยืนยันเท่านั้น', async ({ page }) => {
   await register(page);
+  await expect(page.locator('header').getByRole('button', { name: 'เปิดแชท AI' })).toBeVisible();
   await page.getByRole('button', { name: 'เปิดแชท AI' }).click();
   const chat=page.getByRole('region', { name: 'ผู้ช่วย AI' });
+  await expect(chat).toBeVisible();
   await expect(chat.getByRole('button', { name: 'ส่งคำสั่ง AI' })).toBeDisabled();
   await chat.getByRole('checkbox').check();
   await chat.getByLabel('คำสั่งสำหรับ AI').fill('Playwright AI สร้างงาน');
