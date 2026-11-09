@@ -27,6 +27,8 @@ export async function openTursoDatabase(url:string,authToken:string){
   await client.execute('CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(user_id,project_id,due_date)');
   const projects=await columns('projects');
   if(!projects.has('create_failure_tasks'))await client.execute('ALTER TABLE projects ADD COLUMN create_failure_tasks INTEGER NOT NULL DEFAULT 0');
+  const conversations=await columns('direct_conversations');
+  for(const column of ['alias_low','alias_high'])if(!conversations.has(column))await client.execute(`ALTER TABLE direct_conversations ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
   const active=new AsyncLocalStorage<Transaction>();
   const adapter={
     prepare(sql:string){

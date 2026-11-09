@@ -23,7 +23,7 @@ flowchart LR
 
 ## 1. เตรียม TaskFlow
 
-ทำ setup และเปิด frontend/backend ตาม README ของโปรเจกต์ ให้ API ทำงานที่ port 3000 จากนั้น:
+ทำ setup และเปิด frontend/backend ตาม README ของโปรเจกต์ ให้ API ทำงานที่ port 3001 จากนั้น:
 
 - สมัครบัญชีด้วยอีเมลที่ต้องการรับการเตือนจริง บัญชีตัวอย่างสำหรับเดโมไม่ใช่กล่องอีเมลรับข้อความ
 - สร้าง task ที่ยังไม่ completed และกำหนด `due_date` เป็นวันนี้หรือวันก่อนหน้า
@@ -36,7 +36,7 @@ Key ไม่ได้ให้สิทธิ์ login ผ่านเว็บ
 
 ### มี n8n ติดตั้งบนเครื่องเดียวกับ TaskFlow อยู่แล้ว
 
-เปิด editor ของ n8n ที่ใช้อยู่ Workflow ที่ให้มามี URL เริ่มต้น `http://localhost:3000` จึงไม่ต้องเปลี่ยน URL และ API ใช้ `HOST=127.0.0.1` ตามค่าเริ่มต้นได้
+เปิด editor ของ n8n ที่ใช้อยู่ Workflow ที่ให้มามี URL เริ่มต้น `http://localhost:3001` จึงไม่ต้องเปลี่ยน URL และ API ใช้ `HOST=127.0.0.1` ตามค่าเริ่มต้นได้
 
 ### ใช้ Docker Desktop บน Windows
 
@@ -54,8 +54,8 @@ docker compose -f n8n/docker-compose.yml ps
 **ความต่างของ localhost:** ภายใน container, localhost คือ container เอง ไม่ใช่ Windows ที่รัน API จึงเปลี่ยน URL ใน HTTP Request ทั้งสอง node เป็น:
 
 ```text
-http://host.docker.internal:3000/api/integrations/due-tasks
-http://host.docker.internal:3000/api/integrations/reminders
+http://host.docker.internal:3001/api/integrations/due-tasks
+http://host.docker.internal:3001/api/integrations/reminders
 ```
 
 ตั้ง `HOST=0.0.0.0` ใน `.env` ของ TaskFlow และ restart API เมื่อจำเป็นสำหรับ Docker เพื่อให้ API รับ connection จากเครือข่าย Docker การตั้งค่านี้ทำให้ API listen บน network interfaces ด้วย คงใช้ API key และกำหนด firewall ให้เฉพาะการเชื่อมต่อที่ใช้ ไม่ต้องเปลี่ยน `APP_ORIGIN` เพื่อให้ n8n เรียก: CORS ใช้กับ browser ส่วน server-to-server ใช้ credential [Docker Desktop networking](https://docs.docker.com/desktop/features/networking/)
@@ -69,7 +69,7 @@ http://host.docker.internal:3000/api/integrations/reminders
 3. เปิด **Record sent reminders** และเลือก Header Auth credential เดียวกัน
 4. เปิด **Send task summary** → เลือก/สร้าง **SMTP credential** ใส่ host, port, username/password หรือ app password ตามผู้ให้บริการ ตั้ง TLS/SSL ตามผู้ให้บริการและคงการตรวจ certificate เปิดอยู่ ดู [n8n SMTP credentials](https://docs.n8n.io/integrations/builtin/credentials/send-email/)
 5. เปลี่ยน **From Email** จาก `your-smtp-address@example.com` เป็นอีเมลที่ SMTP อนุญาตให้ส่งจริง **To Email** เป็น expression `user.email` อยู่แล้ว
-6. หาก build แล้วเปิดเว็บที่ port 3000 ให้เปลี่ยนลิงก์ในข้อความอีเมลจาก `http://localhost:5173` เป็น `http://localhost:3000`; ถ้าใช้งานภายนอกให้ใช้ URL ที่ผู้รับเข้าถึงได้
+6. หาก build แล้วเปิดเว็บที่ port 3001 ให้เปลี่ยนลิงก์ในข้อความอีเมลจาก `http://localhost:5174` เป็น `http://localhost:3001`; ถ้าใช้งานภายนอกให้ใช้ URL ที่ผู้รับเข้าถึงได้
 7. เปิด workflow settings ตรวจ timezone **Asia/Bangkok** และเลือก Save
 
 ไฟล์ JSON นี้ไม่เก็บ API key, SMTP password หรือ credential IDs ของใคร ต้องเลือก credentials ใน editor หลัง import นโยบายของ SMTP แต่ละผู้ให้บริการอาจต่างกัน จึงใช้ค่า host/port/วิธียืนยันจากเอกสารของผู้ให้บริการที่คุณเลือก

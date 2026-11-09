@@ -21,7 +21,9 @@ export function openDatabase(path: string) {
   if(!projectColumns.has('create_failure_tasks'))db.exec('ALTER TABLE projects ADD COLUMN create_failure_tasks INTEGER NOT NULL DEFAULT 0');
   const sharedColumns=new Set((db.prepare('PRAGMA table_info(tasks)').all() as {name:string}[]).map(column=>column.name));
   if(!sharedColumns.has('assigned_to'))db.exec('ALTER TABLE tasks ADD COLUMN assigned_to TEXT REFERENCES users(id) ON DELETE SET NULL');
-  db.exec('PRAGMA user_version = 12;');
+  const chatColumns=new Set((db.prepare('PRAGMA table_info(direct_conversations)').all() as {name:string}[]).map(column=>column.name));
+  for(const column of ['alias_low','alias_high'])if(!chatColumns.has(column))db.exec(`ALTER TABLE direct_conversations ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
+  db.exec('PRAGMA user_version = 13;');
   return db;
 }
 export type Database = ReturnType<typeof openDatabase> | import('./turso-db.ts').TursoDatabase;

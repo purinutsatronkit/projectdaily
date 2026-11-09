@@ -20,7 +20,7 @@ export function socialFromEnvironment(env:NodeJS.ProcessEnv=process.env):SocialC
   if(github&&!/^[a-f0-9]{64}$/i.test(tokenKey??'')) throw new Error('Set OAUTH_TOKEN_KEY to 32 random bytes encoded as 64 hex characters.');
   const slug=env.GITHUB_APP_SLUG?.trim();
   if(slug&&!/^[a-z0-9-]+$/i.test(slug)) throw new Error('GITHUB_APP_SLUG is invalid.');
-  return {publicUrl:trustedPublicUrl(env.APP_PUBLIC_URL||env.APP_ORIGIN||'http://localhost:5173',env.NODE_ENV==='production'),google,github:github?{...github,slug}:undefined,tokenKey};
+  return {publicUrl:trustedPublicUrl(env.APP_PUBLIC_URL||env.APP_ORIGIN||'http://localhost:5174',env.NODE_ENV==='production'),google,github:github?{...github,slug}:undefined,tokenKey};
 }
 export function seal(value:string,key:string,owner:string) {
   const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',Buffer.from(key,'hex'),iv);

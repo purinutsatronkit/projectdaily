@@ -17,9 +17,9 @@
 
 ## เตรียมเดโมก่อนเริ่ม
 
-เปิดเว็บที่ `http://localhost:5173` ด้วย `npm run dev` หรือ build แล้วใช้ `npm start` ที่ `http://localhost:3000` เลือกวิธีเดียวตลอดเดโม บัญชีเดโมและคำสั่ง setup อยู่ใน [README](../README.md)
+เปิดเว็บที่ `http://localhost:5174` ด้วย `npm run dev` หรือ build แล้วใช้ `npm start` ที่ `http://localhost:3001` เลือกวิธีเดียวตลอดเดโม บัญชีเดโมและคำสั่ง setup อยู่ใน [README](../README.md)
 
-`npm run dev` ที่ root สั่ง `concurrently` เปิด frontend พอร์ต 5173 กับ backend พอร์ต 3000 เป็นคนละ process ก่อนรันให้หยุดตัวที่เปิดแยกใน IntelliJ หรือ Terminal เดิม ไม่เปิดซ้ำ หากขึ้น `EADDRINUSE` มี process ใช้พอร์ตอยู่แล้ว หากหน้าเว็บขึ้นเชื่อมต่อ API ไม่สำเร็จ ให้ดูว่า backend แสดง `TaskFlow API ready` และเปิด `/api/health` ได้หรือไม่ เปิด Terminal ค้างไว้ระหว่างเดโม
+`npm run dev` ที่ root สั่ง `concurrently` เปิด frontend พอร์ต 5174 กับ backend พอร์ต 3001 เป็นคนละ process ก่อนรันให้หยุดตัวที่เปิดแยกใน IntelliJ หรือ Terminal เดิม ไม่เปิดซ้ำ หากขึ้น `EADDRINUSE` มี process ใช้พอร์ตอยู่แล้ว หากหน้าเว็บขึ้นเชื่อมต่อ API ไม่สำเร็จ ให้ดูว่า backend แสดง `TaskFlow API ready` และเปิด `/api/health` ได้หรือไม่ เปิด Terminal ค้างไว้ระหว่างเดโม
 
 เตรียมเปิดไฟล์ `packages/shared/src/index.ts`, `apps/api/src/tasks.ts`, `apps/api/src/auth.ts`, `apps/api/src/security.ts`, `apps/api/src/password-reset.ts`, `apps/api/src/mail.ts` และ `apps/api/src/schema.sql` ไว้ก่อน ไม่ใช้เวลาพรีเซนต์ค้นชื่อไฟล์ เตรียมชื่อ task เช่น “ส่งสรุป Code Review” พร้อมคำอธิบายหนึ่งบรรทัดและกำหนดส่งเป็นวันนี้ของไทย
 

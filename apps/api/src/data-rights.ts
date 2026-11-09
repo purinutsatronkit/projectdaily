@@ -25,7 +25,7 @@ export function dataRightsRoutes(db:Database,config:Config){
       task_activity:await all(db,'SELECT task_id,task_title,event,changes,created_at,actor_type FROM task_activity WHERE owner_id=? ORDER BY created_at',userId),
       task_links:await all(db,'SELECT task_id,kind,repository,number,created_at FROM task_github_links WHERE user_id=?',userId),
       task_comments:await all(db,'SELECT id,task_id,body,created_at FROM task_comments WHERE author_id=?',userId),
-      direct_conversations:await all(db,'SELECT id,user_low,user_high,created_at,updated_at FROM direct_conversations WHERE user_low=? OR user_high=?',userId,userId),
+      direct_conversations:await all(db,'SELECT id,user_low,user_high,created_at,updated_at,CASE WHEN user_low=? THEN alias_low ELSE alias_high END my_chat_nickname FROM direct_conversations WHERE user_low=? OR user_high=?',userId,userId,userId),
       direct_messages:await all(db,'SELECT m.id,m.conversation_id,m.sender_id,m.body,m.created_at,m.read_at FROM direct_messages m JOIN direct_conversations d ON d.id=m.conversation_id WHERE d.user_low=? OR d.user_high=? ORDER BY m.created_at',userId,userId),
       direct_attachments:(await all<{id:string;message_id:string;filename:string;media_type:string;size:number;data:Uint8Array}>(db,'SELECT a.id,a.message_id,a.filename,a.media_type,a.size,a.data FROM direct_attachments a JOIN direct_messages m ON m.id=a.message_id JOIN direct_conversations d ON d.id=m.conversation_id WHERE d.user_low=? OR d.user_high=?',userId,userId)).map(({data,...file})=>({...file,base64:Buffer.from(data).toString('base64')})),
       mention_notifications:await all(db,'SELECT n.id,n.comment_id,n.created_at,n.read_at FROM mention_notifications n WHERE n.user_id=?',userId),

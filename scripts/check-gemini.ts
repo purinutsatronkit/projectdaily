@@ -15,7 +15,7 @@ else{
       console.log(`Gemini OK (model: ${model})`);
       const db=openDatabase(':memory:');
       try{
-        const origin='http://localhost:5173';
+        const origin='http://localhost:5174';
         const app=createApp(db,{secret:'synthetic-assistant-check-secret-2026',origins:[origin],silent:true,assistant:{key,model}});
         const registered=await app.request('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AI Check',email:'ai-check@example.test',password:'Test!2026'})});
         const cookie=registered.headers.get('set-cookie')?.split(';')[0]??'';

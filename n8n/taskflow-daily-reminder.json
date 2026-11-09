@@ -25,7 +25,7 @@
     },
     {
       "parameters": {
-        "url": "http://host.docker.internal:3000/api/integrations/due-tasks",
+        "url": "http://host.docker.internal:3001/api/integrations/due-tasks",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -91,7 +91,7 @@
         "toEmail": "={{ $json.user.email }}",
         "subject": "={{ 'TaskFlow: ' + $json.tasks.length + ' งานที่ต้องทำ — ' + $json.date }}",
         "emailFormat": "text",
-        "text": "={{ 'สวัสดี ' + $json.user.name + '\\n\\nงานที่ครบกำหนดหรือเลยกำหนด ณ วันที่ ' + $json.date + '\\n\\n' + $json.tasks.map((task, index) => (index + 1) + '. ' + task.title + '\\n   กำหนดส่ง: ' + task.due_date + ' | ความสำคัญ: ' + task.priority + ' | สถานะ: ' + task.status).join('\\n\\n') + '\\n\\nเปิด TaskFlow เพื่ออัปเดตสถานะงาน\\nhttp://localhost:5173\\n\\nอีเมลนี้เป็นการเตือนรายวันจาก workflow ของคุณ' }}",
+        "text": "={{ 'สวัสดี ' + $json.user.name + '\\n\\nงานที่ครบกำหนดหรือเลยกำหนด ณ วันที่ ' + $json.date + '\\n\\n' + $json.tasks.map((task, index) => (index + 1) + '. ' + task.title + '\\n   กำหนดส่ง: ' + task.due_date + ' | ความสำคัญ: ' + task.priority + ' | สถานะ: ' + task.status).join('\\n\\n') + '\\n\\nเปิด TaskFlow เพื่ออัปเดตสถานะงาน\\nhttp://localhost:5174\\n\\nอีเมลนี้เป็นการเตือนรายวันจาก workflow ของคุณ' }}",
         "options": {
           "appendAttribution": false,
           "allowUnauthorizedCerts": false
@@ -117,7 +117,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:3000/api/integrations/reminders",
+        "url": "http://host.docker.internal:3001/api/integrations/reminders",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

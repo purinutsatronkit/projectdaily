@@ -15,7 +15,7 @@ npm.cmd run db:seed
 npm.cmd run dev
 ```
 
-เปิด **http://localhost:5173** สำหรับเว็บ และ **http://localhost:3000/api/health** สำหรับตรวจ API
+เปิด **http://localhost:5174** สำหรับเว็บ และ **http://localhost:3001/api/health** สำหรับตรวจ API
 
 - บัญชีเดโม: `demo@taskflow.local`
 - รหัสผ่านเดโม: `TaskFlow!2026`
@@ -69,7 +69,7 @@ npm.cmd run dev
 npm run setup:email
 ```
 
-คำสั่งเติมตัวแปรอีเมลที่ขาดใน `.env` โดยไม่ทับค่าที่มีอยู่ ให้ใส่ `SMTP_USER` เป็น Gmail ผู้ส่ง และ `SMTP_PASS` เป็น **Google App Password** ของบัญชีนั้น ใช้ค่าเริ่มต้น `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true` พร้อม `APP_PUBLIC_URL=http://localhost:5173` สำหรับ dev หากใช้ `npm start` หลัง build ให้เปลี่ยน URL เป็น `http://localhost:3000` หรือ domain HTTPS จริง แล้วเปิด server ใหม่
+คำสั่งเติมตัวแปรอีเมลที่ขาดใน `.env` โดยไม่ทับค่าที่มีอยู่ ให้ใส่ `SMTP_USER` เป็น Gmail ผู้ส่ง และ `SMTP_PASS` เป็น **Google App Password** ของบัญชีนั้น ใช้ค่าเริ่มต้น `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true` พร้อม `APP_PUBLIC_URL=http://localhost:5174` สำหรับ dev หากใช้ `npm start` หลัง build ให้เปลี่ยน URL เป็น `http://localhost:3001` หรือ domain HTTPS จริง แล้วเปิด server ใหม่
 
 ตรวจ SMTP login แบบไม่ส่งเมลด้วย `npm run mail:check` จากนั้นทดลองจากปุ่ม **ลืมรหัสผ่าน?** ด้วยบัญชีที่สมัครด้วยอีเมลรับจริง บัญชีเดโม `.local` รับอีเมลไม่ได้ การส่งผ่าน Gmail จริงต้องตั้ง credential ของคุณก่อน อ่านวิธีเปิด 2-Step Verification สร้าง App Password และแก้ปัญหาใน [คู่มือ Gmail SMTP และลืมรหัสผ่าน](docs/password-reset-gmail.md) อย่าใส่รหัสผ่าน Gmail ปกติหรือส่ง secret ในแชต
 
@@ -107,7 +107,7 @@ npm run build
 npm start
 ```
 
-หลัง build แล้ว `npm start` ให้ Hono เสิร์ฟทั้ง frontend และ API ที่ **http://localhost:3000** เหมาะกับการเดโมโดยเปิด server เดียว ค่าพัฒนาอนุญาต Origin ทั้ง 5173 และ 3000
+หลัง build แล้ว `npm start` ให้ Hono เสิร์ฟทั้ง frontend และ API ที่ **http://localhost:3001** เหมาะกับการเดโมโดยเปิด server เดียว ค่าพัฒนาอนุญาต Origin ทั้ง 5174 และ 3001
 
 ## เอกสารสำหรับเรียนและพรีเซนต์
 

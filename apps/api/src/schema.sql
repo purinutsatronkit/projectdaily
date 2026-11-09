@@ -161,6 +161,7 @@ CREATE TABLE IF NOT EXISTS direct_conversations (
  id TEXT PRIMARY KEY, user_low TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  user_high TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ alias_low TEXT NOT NULL DEFAULT '', alias_high TEXT NOT NULL DEFAULT '',
  CHECK(user_low<user_high),UNIQUE(user_low,user_high)
 );
 CREATE INDEX IF NOT EXISTS idx_conversations_low ON direct_conversations(user_low,updated_at DESC);

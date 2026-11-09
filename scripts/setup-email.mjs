@@ -7,7 +7,7 @@ if (!existsSync('.env')) {
   const source = readFileSync('.env', 'utf8');
   const keys = new Set([...source.matchAll(/^\s*([A-Z_]+)\s*=/gm)].map(match => match[1]));
   const originLine = source.match(/^\s*APP_ORIGIN\s*=\s*([^\r\n]*)/m)?.[1]?.trim();
-  const origin = originLine?.replace(/^(['"])(.*)\1$/, '$2') || 'http://localhost:5173';
+  const origin = originLine?.replace(/^(['"])(.*)\1$/, '$2') || 'http://localhost:5174';
   const defaults = {
     APP_PUBLIC_URL: origin, SMTP_HOST: 'smtp.gmail.com', SMTP_PORT: '465', SMTP_SECURE: 'true',
     SMTP_USER: '', SMTP_PASS: '', SMTP_FROM: '', SMTP_FROM_NAME: 'TaskFlow',

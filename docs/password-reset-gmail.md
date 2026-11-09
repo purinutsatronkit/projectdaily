@@ -34,7 +34,7 @@ SMTP_USER=your-sender@gmail.com
 SMTP_PASS=YOUR_GOOGLE_APP_PASSWORD
 SMTP_FROM=
 SMTP_FROM_NAME=TaskFlow
-APP_PUBLIC_URL=http://localhost:5173
+APP_PUBLIC_URL=http://localhost:5174
 ```
 
 | ตัวแปร | ใส่อะไร / ใช้ทำอะไร |
@@ -55,8 +55,8 @@ APP_PUBLIC_URL=http://localhost:5173
 
 | วิธีใช้ | `APP_PUBLIC_URL` |
 | --- | --- |
-| `npm run dev` เปิดเว็บบนเครื่อง server | `http://localhost:5173` |
-| `npm run build` แล้ว `npm start` บนเครื่อง server | `http://localhost:3000` |
+| `npm run dev` เปิดเว็บบนเครื่อง server | `http://localhost:5174` |
+| `npm run build` แล้ว `npm start` บนเครื่อง server | `http://localhost:3001` |
 | เปิดใช้งานผ่าน domain จริง | เช่น `https://tasks.example.com` |
 
 ใส่เฉพาะ origin คือ protocol, hostname และ port ถ้ามี ไม่ใส่ `/reset-password`, query string หรือ `#token` โปรแกรมเติม path และ token เอง ใน production ต้องใช้ HTTPS และตั้ง `NODE_ENV=production` พร้อม `APP_ORIGIN` ให้ตรง origin ที่อนุญาต
