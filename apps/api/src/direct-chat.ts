@@ -14,9 +14,28 @@ function imageType(bytes:Uint8Array){
   if(bytes.length>12&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP')return'image/webp';
   return null;
 }
+
+async function readAttachment(file: File) {
+  if (file.size < 1 || file.size > MAX_FILE) throw new ApiError(413, 'FILE_TOO_LARGE', 'ไฟล์ต้องไม่เกิน 5 MB');
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const filename = Array.from(file.name, character => {
+    if (character.charCodeAt(0) < 32 || character === '/' || character === '\\') return '_';
+    return character;
+  }).join('').trim().slice(0, 150) || 'file';
+  if (/\.(html?|svg|js|mjs|exe|bat|cmd|ps1)$/i.test(filename)) throw new ApiError(400, 'FILE_TYPE', 'ไม่รองรับไฟล์ชนิดนี้');
+  return { bytes, filename, mediaType: imageType(bytes) ?? 'application/octet-stream' };
+}
+
+async function checkAttachmentQuota(db: Database, userId: string, size: number) {
+  const used = (await get<{size:number}>(db,'SELECT COALESCE(SUM(size),0) size FROM direct_attachments WHERE uploader_id=?',userId))!.size;
+  if (used + size > MAX_ACCOUNT) throw new ApiError(400,'STORAGE_LIMIT','พื้นที่ไฟล์แชทของบัญชีเต็ม (100 MB)');
+  const total = (await get<{size:number}>(db,'SELECT COALESCE(SUM(size),0) size FROM direct_attachments'))!.size;
+  if (total + size > MAX_TOTAL) throw new ApiError(400,'STORAGE_LIMIT','พื้นที่ไฟล์รวมของระบบเต็ม กรุณาติดต่อผู้ดูแล');
+}
+
 export function directChatRoutes(db:Database){
   const routes=new Hono<Env>();
-  async function access(id:string,userId:string){const room=await get<Conversation>(db,'SELECT id,user_low,user_high FROM direct_conversations WHERE id=? AND (user_low=? OR user_high=?)',id,userId,userId);if(!room)throw new ApiError(404,'NOT_FOUND','ไม่พบห้องแชทนี้');return room;}
+  async function access(id:string,userId:string){const room=await get<Conversation>(db,'SELECT id,user_low,user_high FROM direct_conversations WHERE id=? AND (user_low=? OR user_high=?)',id,userId,userId);if(!room) { throw new ApiError(404,'NOT_FOUND','ไม่พบห้องแชทนี้'); }return room;}
   routes.get('/',async c=>{
     const id=c.get('user').id;
     const conversations=await all(db,`SELECT d.id,d.updated_at,u.id peer_id,u.name peer_name,u.nickname peer_nickname,u.email peer_email,
@@ -61,7 +80,8 @@ export function directChatRoutes(db:Database){
     const messages=await all(db,`SELECT m.id,m.sender_id,m.body,m.created_at,m.read_at,a.id attachment_id,a.filename,a.media_type,a.size
       FROM direct_messages m LEFT JOIN direct_attachments a ON a.message_id=m.id
       WHERE m.conversation_id=? ORDER BY m.created_at DESC,m.id DESC LIMIT 100`,room.id);
-    return c.json({messages:messages.reverse()});
+    messages.reverse();
+    return c.json({messages});
   });
   routes.post('/:id/messages',async c=>{
     const room=await access(c.req.param('id'),c.get('user').id);
@@ -70,17 +90,15 @@ export function directChatRoutes(db:Database){
     const rawBody=form.get('body'),body=typeof rawBody==='string'?rawBody.trim():'';
     const file=form.get('file');if(file!==null&&!(file instanceof File))throw new ApiError(400,'INVALID_FILE','ไฟล์ไม่ถูกต้อง');
     if(body.length>4000||(!body&&!file))throw new ApiError(400,'INVALID_MESSAGE','กรอกข้อความหรือเลือกไฟล์ ข้อความยาวได้ไม่เกิน 4,000 ตัวอักษร');
-    let bytes:Uint8Array|null=null,mediaType='',filename='';
-    if(file){if(file.size<1||file.size>MAX_FILE)throw new ApiError(413,'FILE_TOO_LARGE','ไฟล์ต้องไม่เกิน 5 MB');
-      bytes=new Uint8Array(await file.arrayBuffer());filename=file.name.replace(/[\\/\x00-\x1f]/g,'_').trim().slice(0,150)||'file';
-      if(/\.(html?|svg|js|mjs|exe|bat|cmd|ps1)$/i.test(filename))throw new ApiError(400,'FILE_TYPE','ไม่รองรับไฟล์ชนิดนี้');
-      mediaType=imageType(bytes)??'application/octet-stream';
-    }
-    const id=randomUUID(),stamp=now();
+    const attachment = file ? await readAttachment(file) : null;
+    const id=randomUUID(),stamp=now(),userId=c.get('user').id;
     await transaction(db,async()=>{
-      if(bytes){const used=(await get<{size:number}>(db,'SELECT COALESCE(SUM(size),0) size FROM direct_attachments WHERE uploader_id=?',c.get('user').id))!.size;if(used+bytes.length>MAX_ACCOUNT)throw new ApiError(400,'STORAGE_LIMIT','พื้นที่ไฟล์แชทของบัญชีเต็ม (100 MB)');const total=(await get<{size:number}>(db,'SELECT COALESCE(SUM(size),0) size FROM direct_attachments'))!.size;if(total+bytes.length>MAX_TOTAL)throw new ApiError(400,'STORAGE_LIMIT','พื้นที่ไฟล์รวมของระบบเต็ม กรุณาติดต่อผู้ดูแล');}
-      await db.prepare('INSERT INTO direct_messages VALUES(?,?,?,?,?,NULL)').run(id,room.id,c.get('user').id,body,stamp);
-      if(bytes)await db.prepare('INSERT INTO direct_attachments VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),id,c.get('user').id,filename,mediaType,bytes.length,bytes,stamp);
+      if (attachment) await checkAttachmentQuota(db, userId, attachment.bytes.length);
+      await db.prepare('INSERT INTO direct_messages VALUES(?,?,?,?,?,NULL)').run(id,room.id,userId,body,stamp);
+      if (attachment) {
+        const { bytes, filename, mediaType } = attachment;
+        await db.prepare('INSERT INTO direct_attachments VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),id,userId,filename,mediaType,bytes.length,bytes,stamp);
+      }
       await db.prepare('UPDATE direct_conversations SET updated_at=? WHERE id=?').run(stamp,room.id);
     });
     return c.json({id},201);

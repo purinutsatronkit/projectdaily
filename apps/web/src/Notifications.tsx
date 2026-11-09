@@ -30,10 +30,10 @@ export default function Notifications({ revision, onSelect, onGitHub, onMention,
         const result: Data = await response.json();
         if(active && !controller.signal.aborted) { hasLoaded.current=true;setData(result); setError('');setLoading(false); }
         const [mentionResponse,chatResponse]=await Promise.all([fetch('/api/notifications/mentions',{credentials:'same-origin',signal:controller.signal}),fetch('/api/chat/unread',{credentials:'same-origin',signal:controller.signal})]);
-        if(active&&!controller.signal.aborted){if(mentionResponse.ok)setMentions((await mentionResponse.json()).mentions);if(chatResponse.ok)setChatUnread((await chatResponse.json()).count);}
+        if(active&&!controller.signal.aborted){if(mentionResponse.ok) { setMentions((await mentionResponse.json()).mentions); }if(chatResponse.ok)setChatUnread((await chatResponse.json()).count);}
         if(Date.now()-lastGitHubCheck.current<300000)return;
         lastGitHubCheck.current=Date.now();
-        try{const github=await fetch('/api/github/alerts',{credentials:'same-origin',signal:controller.signal});if(github.status===401){onExpired();return;}if(!github.ok)throw new Error('โหลดสถานะ GitHub ไม่สำเร็จ');const info=await github.json();if(active&&!controller.signal.aborted){setPipeline(info.notifications);setPipelineError(info.failures?'ตรวจ pipeline บาง repository ไม่สำเร็จ ตรวจสิทธิ์ GitHub App':'' );}}catch(err){if(controller.signal.aborted)lastGitHubCheck.current=0;else if(active)setPipelineError(err instanceof Error?err.message:'โหลดสถานะ GitHub ไม่สำเร็จ');}
+        try{const github=await fetch('/api/github/alerts',{credentials:'same-origin',signal:controller.signal});if(github.status===401){onExpired();return;}if(!github.ok) { throw new Error('โหลดสถานะ GitHub ไม่สำเร็จ'); }const info=await github.json();if(active&&!controller.signal.aborted){setPipeline(info.notifications);setPipelineError(info.failures?'ตรวจ pipeline บาง repository ไม่สำเร็จ ตรวจสิทธิ์ GitHub App':'' );}}catch(err){if(controller.signal.aborted)lastGitHubCheck.current=0;else if(active)setPipelineError(err instanceof Error?err.message:'โหลดสถานะ GitHub ไม่สำเร็จ');}
       } catch(err) { if(active && !controller.signal.aborted) setError(err instanceof Error ? err.message : 'โหลดการแจ้งเตือนไม่สำเร็จ'); }
       finally { if(active && !controller.signal.aborted) setLoading(false); }
     }
@@ -69,7 +69,7 @@ export default function Notifications({ revision, onSelect, onGitHub, onMention,
     } catch(err) {setError(err instanceof Error?err.message:'บันทึกการอ่านไม่สำเร็จ');}
     finally {setReading(false);if(saved)setRetry(value=>value+1);}
   }
-  async function openMention(item:MentionNotification){try{const response=await fetch(`/api/notifications/mentions/${item.id}/read`,{method:'PATCH',credentials:'same-origin'});if(!response.ok)throw new Error('บันทึกการอ่านไม่สำเร็จ');setMentions(previous=>previous.filter(v=>v.id!==item.id));setOpen(false);onMention(item.task_id,item.project_id);}catch(e){setError((e as Error).message);}}
+  async function openMention(item:MentionNotification){try{const response=await fetch(`/api/notifications/mentions/${item.id}/read`,{method:'PATCH',credentials:'same-origin'});if(!response.ok) { throw new Error('บันทึกการอ่านไม่สำเร็จ'); }setMentions(previous=>previous.filter(v=>v.id!==item.id));setOpen(false);onMention(item.task_id,item.project_id);}catch(e){setError((e as Error).message);}}
   const count=(data?.count || 0)+pipeline.length+mentions.length+chatUnread;
   return <div ref={root} className="relative">
     <button ref={button} type="button" className="icon-button relative !h-10 !w-10" aria-label={error ? 'การแจ้งเตือน โหลดไม่สำเร็จ' : `การแจ้งเตือน ยังไม่อ่าน ${count} รายการ`} aria-expanded={open} aria-controls="task-notifications" onClick={()=>setOpen(value=>!value)}>

@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "baseUrl": ".",
+    "paths": { "@taskflow/shared": ["packages/shared/src/index.ts"] }
+  },
+  "include": [
+    "apps/api/src",
+    "apps/web/src",
+    "apps/web/vite.config.ts",
+    "packages/shared/src",
+    "scripts",
+    "tests",
+    "e2e",
+    "playwright.config.ts",
+    "tmp/sk09/render-sample.ts"
+  ]
+}

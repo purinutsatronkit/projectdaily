@@ -12,6 +12,30 @@ const GENERIC_MESSAGE = 'หากอีเมลนี้มีบัญชี�
 const digest = (token: string) => createHash('sha256').update(token).digest('hex');
 interface ResetToken { id: string; user_id: string; token_hash: string; expires_at: string; used_at: string | null }
 
+async function scheduleResetEmail(
+  db: Database, mail: NonNullable<Config['passwordReset']>, publicUrl: string | undefined,
+  user: { id: string; email: string }, timestamp: string, requestId: string, silent: Config['silent'],
+) {
+  const recent = await get<{ total: number; latest: string | null }>(db,
+    'SELECT COUNT(*) AS total, MAX(created_at) AS latest FROM password_reset_tokens WHERE user_id=? AND created_at>?',
+    user.id, new Date(Date.now() - 60 * 60_000).toISOString());
+  if (!recent || (recent.total < 3 && (!recent.latest || Date.now() - Date.parse(recent.latest) >= 60_000))) {
+    const token = randomBytes(32).toString('hex'), id = randomUUID();
+    await db.prepare('INSERT INTO password_reset_tokens(id,user_id,token_hash,expires_at,created_at) VALUES(?,?,?,?,?)')
+      .run(id, user.id, digest(token), new Date(Date.now() + EXPIRES_MINUTES * 60_000).toISOString(), timestamp);
+    const link = new URL('/reset-password', publicUrl);
+    link.hash = new URLSearchParams({ token }).toString();
+    // SMTP runs after accepting the request, avoiding account-dependent network response times.
+    setImmediate(() => {
+      mail.send({ to: user.email, resetUrl: link.toString(), expiresMinutes: EXPIRES_MINUTES }).catch(async () => {
+        await db.prepare('DELETE FROM password_reset_tokens WHERE id=? AND used_at IS NULL').run(id);
+        // Do not log SMTP errors: they may contain addresses, credentials, or reset links.
+        if (!silent) console.error(JSON.stringify({ level: 'error', event: 'password_reset_email_failed', request_id: requestId }));
+      });
+    });
+  }
+}
+
 export function passwordResetRoutes(db: Database, config: Config) {
   const routes = new Hono<Env>();
   const mail = config.passwordReset;
@@ -25,27 +49,7 @@ export function passwordResetRoutes(db: Database, config: Config) {
     // Keep at least one hour of request history for the persistent per-account limit.
     await db.prepare('DELETE FROM password_reset_tokens WHERE created_at<? AND expires_at<=?')
       .run(new Date(Date.now() - 24 * 60 * 60_000).toISOString(), timestamp);
-    if (user) {
-      const recent = await get<{ total: number; latest: string | null }>(db,
-        'SELECT COUNT(*) AS total, MAX(created_at) AS latest FROM password_reset_tokens WHERE user_id=? AND created_at>?',
-        user.id, new Date(Date.now() - 60 * 60_000).toISOString());
-      if (!recent || (recent.total < 3 && (!recent.latest || Date.now() - Date.parse(recent.latest) >= 60_000))) {
-        const token = randomBytes(32).toString('hex'), id = randomUUID();
-        await db.prepare('INSERT INTO password_reset_tokens(id,user_id,token_hash,expires_at,created_at) VALUES(?,?,?,?,?)')
-          .run(id, user.id, digest(token), new Date(Date.now() + EXPIRES_MINUTES * 60_000).toISOString(), timestamp);
-        const link = new URL('/reset-password', publicUrl);
-        link.hash = new URLSearchParams({ token }).toString();
-        const requestId = c.get('requestId');
-        // SMTP runs after accepting the request, avoiding account-dependent network response times.
-        setImmediate(() => {
-          void mail.send({ to: user.email, resetUrl: link.toString(), expiresMinutes: EXPIRES_MINUTES }).catch(async () => {
-            await db.prepare('DELETE FROM password_reset_tokens WHERE id=? AND used_at IS NULL').run(id);
-            // Do not log SMTP errors: they may contain addresses, credentials, or reset links.
-            if (!config.silent) console.error(JSON.stringify({ level: 'error', event: 'password_reset_email_failed', request_id: requestId }));
-          });
-        });
-      }
-    }
+    if (user) await scheduleResetEmail(db, mail, publicUrl, user, timestamp, c.get('requestId'), config.silent);
     return c.json({ message: GENERIC_MESSAGE }, 202);
   });
 

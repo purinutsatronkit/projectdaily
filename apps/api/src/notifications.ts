@@ -36,7 +36,7 @@ export function notificationRoutes(db:Database) {
   routes.get('/mentions',async c=>c.json({mentions:await all(db,`SELECT n.id,n.created_at,c.task_id,c.body,u.name author_name,t.title task_title,t.project_id
     FROM mention_notifications n JOIN task_comments c ON c.id=n.comment_id JOIN users u ON u.id=c.author_id JOIN tasks t ON t.id=c.task_id
     WHERE n.user_id=? AND n.read_at IS NULL AND (t.user_id=n.user_id OR EXISTS(SELECT 1 FROM project_members pm WHERE pm.project_id=t.project_id AND pm.user_id=n.user_id)) ORDER BY n.created_at DESC LIMIT 100`,c.get('user').id)}));
-  routes.patch('/mentions/:id/read',async c=>{const result=await db.prepare('UPDATE mention_notifications SET read_at=COALESCE(read_at,?) WHERE id=? AND user_id=?').run(now(),c.req.param('id'),c.get('user').id);if(!result.changes)throw new ApiError(404,'NOT_FOUND','ไม่พบการแจ้งเตือนนี้');return c.body(null,204);});
+  routes.patch('/mentions/:id/read',async c=>{const result=await db.prepare('UPDATE mention_notifications SET read_at=COALESCE(read_at,?) WHERE id=? AND user_id=?').run(now(),c.req.param('id'),c.get('user').id);if(!result.changes) { throw new ApiError(404,'NOT_FOUND','ไม่พบการแจ้งเตือนนี้'); }return c.body(null,204);});
   routes.patch('/:id/read',async c=>{
     const result=await db.prepare('UPDATE task_notifications SET read_at=COALESCE(read_at,?) WHERE id=? AND user_id=?').run(now(),c.req.param('id'),c.get('user').id);
     if(!result.changes) throw new ApiError(404,'NOT_FOUND','ไม่พบการแจ้งเตือนนี้');

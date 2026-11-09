@@ -8,6 +8,15 @@ import type { Database } from './db.ts';
 
 export const USER_COLUMNS = "id,name,email,nickname,phone,email_verified_at,CASE WHEN avatar IS NULL THEN NULL ELSE '/api/account/avatar?v=' || avatar_version END AS avatar_url";
 export async function readUser(db: Database, id: string) { return (await get<User>(db, `SELECT ${USER_COLUMNS} FROM users WHERE id=?`, id))!; }
+
+function avatarMediaType(bytes: Buffer) {
+  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'image/png';
+  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return 'image/jpeg';
+  if (['GIF87a', 'GIF89a'].includes(bytes.subarray(0, 6).toString())) return 'image/gif';
+  if (bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP') return 'image/webp';
+  return null;
+}
+
 export function accountRoutes(db: Database,config:Config) {
   const routes = new Hono<Env>();
   routes.get('/', async c => c.json({ user: await readUser(db, c.get('user').id) }));
@@ -42,10 +51,7 @@ export function accountRoutes(db: Database,config:Config) {
   routes.put('/avatar', async c => {
     const bytes = Buffer.from(await c.req.arrayBuffer());
     const type = c.req.header('content-type')?.split(';')[0];
-    const actual = bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) ? 'image/png'
-      : bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 ? 'image/jpeg'
-      : ['GIF87a','GIF89a'].includes(bytes.subarray(0,6).toString()) ? 'image/gif'
-      : bytes.subarray(0,4).toString() === 'RIFF' && bytes.subarray(8,12).toString() === 'WEBP' ? 'image/webp' : null;
+    const actual = avatarMediaType(bytes);
     if (!actual || type !== actual) throw new ApiError(400, 'INVALID_IMAGE', 'ใช้ไฟล์ JPG, PNG, GIF หรือ WebP เท่านั้น');
     await db.prepare('UPDATE users SET avatar=?,avatar_type=?,avatar_version=? WHERE id=?').run(bytes,actual,randomUUID(),c.get('user').id);
     return c.json({ user: await readUser(db, c.get('user').id) });

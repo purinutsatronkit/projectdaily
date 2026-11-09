@@ -1,16 +1,16 @@
 import {randomUUID} from 'node:crypto';
 import {Hono} from 'hono';
 import {z} from 'zod';
-import {ApiError,get,now,parseBody,type Config,type Env} from './context.ts';
+import {all,ApiError,get,now,parseBody,type Config,type Env} from './context.ts';
 import {seal,unseal} from './social-config.ts';
 import {exchange,tokenPayload} from './social.ts';
 import type {Database} from './db.ts';
 import {recordTaskActivity} from './task-activity.ts';
-import {all} from './context.ts';
 
 const segment=z.string().min(1).max(100).regex(/^[A-Za-z0-9_.-]+$/).refine(v=>v!=='.'&&v!=='..');
 const numberId=z.string().regex(/^[1-9]\d{0,18}$/);
-const refSchema=z.string().min(1).max(255).refine(v=>!/[\x00-\x1f]/.test(v));
+const hasAsciiControl = (value: string) => Array.from(value).some(character => character.charCodeAt(0) < 32);
+const refSchema=z.string().min(1).max(255).refine(v=>!hasAsciiControl(v));
 const inputsSchema=z.record(z.string().min(1).max(100),z.union([z.string().max(2000),z.boolean(),z.number()])).refine(v=>Object.keys(v).length<=25);
 export function githubRoutes(db:Database,config:Config) {
   const routes=new Hono<Env>(),refreshing=new Map<string,Promise<string>>();
@@ -50,10 +50,10 @@ export function githubRoutes(db:Database,config:Config) {
     if(response.status===204) return null;
     const reader=response.body?.getReader();if(!reader) return null;
     const chunks:Uint8Array[]=[];let size=0;
-    for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>8*1024*1024){await reader.cancel();throw new ApiError(400,'GITHUB_TOO_LARGE','ข้อมูลชุดนี้มีขนาดใหญ่ กรุณาเปิดดูบน GitHub');}chunks.push(value);}
+    for(;;){const {done,value}=await reader.read();if(done) { break; }size+=value.length;if(size>8*1024*1024){await reader.cancel();throw new ApiError(400,'GITHUB_TOO_LARGE','ข้อมูลชุดนี้มีขนาดใหญ่ กรุณาเปิดดูบน GitHub');}chunks.push(value);}
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   }
-  const parse=<T>(schema:z.ZodType<T>,value:unknown)=>{const result=schema.safeParse(value);if(!result.success)throw new ApiError(400,'INVALID_GITHUB_PARAMETER','พารามิเตอร์ GitHub ไม่ถูกต้อง');return result.data;};
+  const parse=<T>(schema:z.ZodType<T>,value:unknown)=>{const result=schema.safeParse(value);if(!result.success) { throw new ApiError(400,'INVALID_GITHUB_PARAMETER','พารามิเตอร์ GitHub ไม่ถูกต้อง'); }return result.data;};
   const page=(value:string|undefined)=>parse(z.coerce.number().int().min(1).max(1000),value??'1');
   routes.get('/actions',async c=>c.json({actions:await all(db,'SELECT id,repository,action,target,created_at FROM pipeline_actions WHERE user_id=? ORDER BY created_at DESC LIMIT 50',c.get('user').id)}));
   routes.get('/alerts',async c=>{
@@ -90,7 +90,7 @@ export function githubRoutes(db:Database,config:Config) {
   });
   routes.patch('/alerts/:id/read',async c=>{
     const result=await db.prepare('UPDATE pipeline_notifications SET read_at=COALESCE(read_at,?) WHERE id=? AND user_id=?').run(now(),c.req.param('id'),c.get('user').id);
-    if(!result.changes)throw new ApiError(404,'NOT_FOUND','ไม่พบการแจ้งเตือนนี้');return c.body(null,204);
+    if(!result.changes) { throw new ApiError(404,'NOT_FOUND','ไม่พบการแจ้งเตือนนี้'); }return c.body(null,204);
   });
   routes.get('/installations',async c=>c.json(await api(c.get('user').id,`/user/installations?per_page=30&page=${page(c.req.query('page'))}`)));
   routes.get('/installations/:id/repos',async c=>c.json(await api(c.get('user').id,`/user/installations/${parse(numberId,c.req.param('id'))}/repositories?per_page=30&page=${page(c.req.query('page'))}`)));
@@ -121,7 +121,7 @@ export function githubRoutes(db:Database,config:Config) {
       limited:{reviews:reviews.status==='rejected',files:files.status==='rejected',checks:checks.status==='rejected'}});
   });
   routes.get('/repos/:owner/:repo/files',async c=>{
-    const path=parse(z.string().max(2000).refine(v=>!v.split('/').some(p=>p==='.'||p==='..')&&!/[\x00-\x1f\\]/.test(v)),c.req.query('path')??'');
+    const path=parse(z.string().max(2000).refine(v=>!v.split('/').some(p=>p==='.'||p==='..')&&!hasAsciiControl(v)&&!v.includes('\\')),c.req.query('path')??'');
     const ref=parse(refSchema,c.req.query('ref'));
     const result=await api(c.get('user').id,`${base(c.req.param('owner'),c.req.param('repo'))}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(ref)}`);
     if(Array.isArray(result)) return c.json({kind:'directory',entries:result.map(({name,path,type,size}:any)=>({name,path,type,size})),limited:result.length>=1000});

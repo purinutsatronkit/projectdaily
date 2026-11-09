@@ -23,6 +23,6 @@ export function focusRoutes(db:Database){
     else await db.prepare('INSERT INTO task_schedule VALUES(?,?,?,?,?,?,?)').run(randomUUID(),userId,body.task_id,body.plan_date,body.start_time,body.end_time,now());
     return c.json({slot:await get(db,'SELECT id,task_id,plan_date,start_time,end_time FROM task_schedule WHERE user_id=? AND task_id=? AND plan_date=?',userId,body.task_id,body.plan_date)});
   });
-  routes.delete('/:id',async c=>{const change=await db.prepare('DELETE FROM task_schedule WHERE id=? AND user_id=?').run(c.req.param('id'),c.get('user').id);if(!change.changes)throw new ApiError(404,'NOT_FOUND','ไม่พบช่วงเวลานี้');return c.body(null,204);});
+  routes.delete('/:id',async c=>{const change=await db.prepare('DELETE FROM task_schedule WHERE id=? AND user_id=?').run(c.req.param('id'),c.get('user').id);if(!change.changes) { throw new ApiError(404,'NOT_FOUND','ไม่พบช่วงเวลานี้'); }return c.body(null,204);});
   return routes;
 }

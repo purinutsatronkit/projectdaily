@@ -1,14 +1,10 @@
 import {readFileSync} from 'node:fs';
 import {AsyncLocalStorage} from 'node:async_hooks';
-import {createClient,type Transaction} from '@libsql/client';
+import {createClient,type Client,type Transaction} from '@libsql/client';
 
 type Params=(string|number|null|Uint8Array)[];
 
-/** Asynchronous SQL adapter for Turso and local libSQL integration tests. */
-export async function openTursoDatabase(url:string,authToken:string){
-  if(!/^(libsql|https):\/\/[^/]+$/.test(url)&&!url.startsWith('file:'))throw new Error('TURSO_DATABASE_URL must be a libsql:// or https:// host');
-  if(!authToken&&!url.startsWith('file:'))throw new Error('TURSO_AUTH_TOKEN is required');
-  const client=createClient({url,authToken,intMode:'number'});
+async function initializeSchema(client: Client) {
   const schema=readFileSync(new URL('./schema.sql',import.meta.url),'utf8');
   // Turso's HTTP endpoint may reject the Hrana `sequence` request used by
   // executeMultiple. Send each DDL statement through the ordinary execute API.
@@ -16,6 +12,9 @@ export async function openTursoDatabase(url:string,authToken:string){
     if (/^PRAGMA\s+(journal_mode|foreign_keys|user_version)\b/i.test(statement)) continue;
     await client.execute(statement);
   }
+}
+
+async function migrateSchema(client: Client) {
   const columns=async(table:string)=>new Set((await client.execute(`PRAGMA table_info(${table})`)).rows.map(row=>String(row.name)));
   const users=await columns('users');
   for(const [name,definition] of Object.entries({nickname:"TEXT NOT NULL DEFAULT ''",phone:"TEXT NOT NULL DEFAULT ''",avatar:'BLOB',avatar_type:'TEXT',avatar_version:'TEXT',email_verified_at:'TEXT'})){
@@ -28,7 +27,18 @@ export async function openTursoDatabase(url:string,authToken:string){
   const projects=await columns('projects');
   if(!projects.has('create_failure_tasks'))await client.execute('ALTER TABLE projects ADD COLUMN create_failure_tasks INTEGER NOT NULL DEFAULT 0');
   const conversations=await columns('direct_conversations');
-  for(const column of ['alias_low','alias_high'])if(!conversations.has(column))await client.execute(`ALTER TABLE direct_conversations ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
+  for(const column of ['alias_low','alias_high']) {
+    if(!conversations.has(column))await client.execute(`ALTER TABLE direct_conversations ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`);
+  }
+}
+
+/** Asynchronous SQL adapter for Turso and local libSQL integration tests. */
+export async function openTursoDatabase(url:string,authToken:string){
+  if(!/^(libsql|https):\/\/[^/]+$/.test(url)&&!url.startsWith('file:'))throw new Error('TURSO_DATABASE_URL must be a libsql:// or https:// host');
+  if(!authToken&&!url.startsWith('file:'))throw new Error('TURSO_AUTH_TOKEN is required');
+  const client=createClient({url,authToken,intMode:'number'});
+  await initializeSchema(client);
+  await migrateSchema(client);
   const active=new AsyncLocalStorage<Transaction>();
   const adapter={
     prepare(sql:string){

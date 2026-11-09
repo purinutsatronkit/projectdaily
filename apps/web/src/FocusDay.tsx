@@ -4,7 +4,7 @@ import type {Task} from '@taskflow/shared';
 
 type Slot={id:string;task_id:string;plan_date:string;start_time:string;end_time:string;title:string;status:string};
 const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Bangkok'});
-async function request(path:string,options:RequestInit={}){const response=await fetch(`/api/focus${path}`,{...options,credentials:'same-origin',headers:{...(options.body?{'Content-Type':'application/json'}:{})}});const data=response.status===204?null:await response.json();if(!response.ok)throw new Error(data?.error?.message??'จัดเวลาไม่สำเร็จ');return data;}
+async function request(path:string,options:RequestInit={}){const response=await fetch(`/api/focus${path}`,{...options,credentials:'same-origin',headers:{...(options.body?{'Content-Type':'application/json'}:{})}});const data=response.status===204?null:await response.json();if(!response.ok) { throw new Error(data?.error?.message??'จัดเวลาไม่สำเร็จ'); }return data;}
 export default function FocusDay({tasks,onSelect}:{tasks:Task[];onSelect:(task:Task)=>void}){
   const [date,setDate]=useState(today),[slots,setSlots]=useState<Slot[]>([]),[revision,setRevision]=useState(0),[taskId,setTaskId]=useState(''),[start,setStart]=useState('09:00'),[end,setEnd]=useState('10:00'),[error,setError]=useState('');
   useEffect(()=>{void request(`?date=${date}`).then(v=>setSlots(v.slots)).catch(e=>setError(e.message));},[date,revision]);

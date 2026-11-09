@@ -40,7 +40,7 @@ export function dataRightsRoutes(db:Database,config:Config){
     return c.body(JSON.stringify(data,null,2));
   });
   routes.post('/delete-account',async c=>{
-    const {email,confirmation,password}=await parseBody(c,z.object({email:z.email(),confirmation:z.literal('DELETE'),password:z.string().max(128).optional()}));
+    const {email,password}=await parseBody(c,z.object({email:z.email(),confirmation:z.literal('DELETE'),password:z.string().max(128).optional()}));
     const userId=c.get('user').id;
     if(email.trim().toLowerCase()!==c.get('user').email)throw new ApiError(400,'CONFIRMATION_MISMATCH','กรอกอีเมลของบัญชีให้ตรง');
     const record=(await get<{password_hash:string}>(db,'SELECT password_hash FROM users WHERE id=?',userId))!;
