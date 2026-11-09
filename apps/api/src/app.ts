@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { secureHeaders } from 'hono/secure-headers';
 import { HTTPException } from 'hono/http-exception';
-import { ApiError, type Config, type Env, type Middleware } from './context.ts';
+import { ApiError, type AppContext, type Config, type Env, type Middleware } from './context.ts';
 import { authRoutes, sessionMiddleware } from './auth.ts';
 import { taskRoutes, readSummary } from './tasks.ts';
 import { notificationRoutes } from './notifications.ts';
@@ -23,36 +23,68 @@ import {focusRoutes} from './focus.ts';
 import {taskCommentRoutes} from './task-comments.ts';
 import {directChatRoutes} from './direct-chat.ts';
 
+function limitBody(maxSize: number, message: string) {
+  return bodyLimit({ maxSize, onError: (c: AppContext) => c.json({error:{code:'BODY_TOO_LARGE',message,request_id:c.get('requestId')}},413) });
+}
+
+const limitApiBody: Middleware = (c, next) => {
+  const { path, method } = c.req;
+  if (method === 'POST' && /^\/api\/chat\/[^/]+\/messages$/.test(path)) {
+    return limitBody(5 * 1024 * 1024 + 32 * 1024, 'ไฟล์ต้องไม่เกิน 5 MB')(c, next);
+  }
+  if (method === 'PUT' && path === '/api/account/avatar') {
+    return limitBody(2 * 1024 * 1024, 'รูปภาพต้องมีขนาดไม่เกิน 2 MB')(c, next);
+  }
+  if (method === 'PUT' && path === '/api/sk09/draft') {
+    return limitBody(64 * 1024, 'ร่างมีขนาดเกิน 64 KB')(c, next);
+  }
+  return limitBody(16 * 1024, 'ข้อมูลมีขนาดเกิน 16 KB')(c, next);
+};
+
+const checkOrigin = (config: Config): Middleware => async (c, next) => {
+  if (!['GET','HEAD','OPTIONS'].includes(c.req.method)) {
+    const origin = c.req.header('origin');
+    if ((origin && !config.origins.includes(origin)) || c.req.header('sec-fetch-site') === 'cross-site') throw new ApiError(403,'ORIGIN_DENIED','แหล่งที่มาของคำขอไม่ได้รับอนุญาต');
+  }
+  await next();
+};
+
+function createRateLimiter(config: Config) {
+  const attempts = new Map<string,{ count: number; until: number }>();
+  return (bucket: string, limit: number, message: string): Middleware => async(c,next) => {
+    const ip = config.clientIp?.(c) ?? 'local', time = Date.now();
+    if (attempts.size > 10_000) {
+      for (const [key,value] of attempts) {
+        if (value.until <= time) attempts.delete(key);
+      }
+    }
+    const key = `${bucket}:${ip}`;
+    const previous = attempts.get(key), entry = previous && previous.until > time ? previous : {count:0,until:time+15*60_000};
+    if (++entry.count > limit) {
+      c.header('Retry-After',String(Math.ceil((entry.until-time)/1000)));
+      throw new ApiError(429,'RATE_LIMITED',message);
+    }
+    attempts.set(key,entry);
+    await next();
+  };
+}
+
+function errorResponse(error: Error, c: AppContext, silent: Config['silent']) {
+  const status = error instanceof ApiError || error instanceof HTTPException ? error.status : 500;
+  const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR';
+  if (status >= 500 && !silent) console.error(JSON.stringify({level:'error',request_id:c.get('requestId'),method:c.req.method,path:c.req.path,status}));
+  return c.json({error:{code,message:status >= 500 && !(error instanceof ApiError && status === 503) ? 'ระบบเกิดข้อผิดพลาด กรุณาลองใหม่' : error.message,request_id:c.get('requestId')}},status);
+}
+
 export function createApp(db: Database,config: Config) {
   if (config.secret.length < 32) throw new Error('JWT_SECRET must have at least 32 characters. Run npm run setup.');
   const app = new Hono<Env>();
   app.use('*',async (c,next) => { c.set('requestId',randomUUID()); c.header('X-Request-ID',c.get('requestId')); await next(); });
   app.use('*',secureHeaders({ strictTransportSecurity: config.production ? 'max-age=15552000; includeSubDomains' : false }));
   app.use('/api/*',async(c,next) => { c.header('Cache-Control','no-store'); await next(); });
-  const limit = (maxSize: number, message: string) => bodyLimit({ maxSize, onError: (c: import('./context.ts').AppContext) => c.json({error:{code:'BODY_TOO_LARGE',message,request_id:c.get('requestId')}},413) });
-  app.use('/api/*', (c,next) => /^\/api\/chat\/[^/]+\/messages$/.test(c.req.path) && c.req.method === 'POST'
-    ? limit(5 * 1024 * 1024 + 32 * 1024,'ไฟล์ต้องไม่เกิน 5 MB')(c,next)
-    : c.req.path === '/api/account/avatar' && c.req.method === 'PUT'
-    ? limit(2 * 1024 * 1024,'รูปภาพต้องมีขนาดไม่เกิน 2 MB')(c,next)
-    : c.req.path === '/api/sk09/draft' && c.req.method === 'PUT'
-      ? limit(64 * 1024,'ร่างมีขนาดเกิน 64 KB')(c,next)
-      : limit(16 * 1024,'ข้อมูลมีขนาดเกิน 16 KB')(c,next));
-  app.use('/api/*',async(c,next) => {
-    if (!['GET','HEAD','OPTIONS'].includes(c.req.method)) {
-      const origin = c.req.header('origin');
-      if ((origin && !config.origins.includes(origin)) || c.req.header('sec-fetch-site') === 'cross-site') throw new ApiError(403,'ORIGIN_DENIED','แหล่งที่มาของคำขอไม่ได้รับอนุญาต');
-    }
-    await next();
-  });
-  const attempts = new Map<string,{ count: number; until: number }>();
-  const rateLimit = (bucket: string, limit: number, message: string): Middleware => async(c,next) => {
-    const ip = config.clientIp?.(c) ?? 'local', time = Date.now();
-    if (attempts.size > 10_000) for (const [key,value] of attempts) if (value.until <= time) attempts.delete(key);
-    const key = `${bucket}:${ip}`;
-    const previous = attempts.get(key), entry = previous && previous.until > time ? previous : {count:0,until:time+15*60_000};
-    if (++entry.count > limit) { c.header('Retry-After',String(Math.ceil((entry.until-time)/1000))); throw new ApiError(429,'RATE_LIMITED',message); }
-    attempts.set(key,entry); await next();
-  };
+  app.use('/api/*', limitApiBody);
+  app.use('/api/*', checkOrigin(config));
+  const rateLimit = createRateLimiter(config);
   const authLimit = rateLimit('auth',config.authLimit ?? 20,'ลองเข้าสู่ระบบมากเกินไป กรุณารอสักครู่');
   app.use('/api/auth/login',authLimit); app.use('/api/auth/register',authLimit);
   for(const path of ['/api/auth/google/start','/api/auth/google/link','/api/auth/github/start']) app.use(path,authLimit);
@@ -107,11 +139,6 @@ export function createApp(db: Database,config: Config) {
   app.route('/api/integrations',integrationRoutes(db,config.production));
   app.get('/api/health',async c => { await db.prepare('SELECT 1').get(); return c.json({status:'ok',service:'taskflow-api'}); });
   app.notFound(c => c.json({error:{code:'NOT_FOUND',message:'ไม่พบเส้นทางนี้',request_id:c.get('requestId')}},404));
-  app.onError((error,c) => {
-    const status = error instanceof ApiError ? error.status : error instanceof HTTPException ? error.status : 500;
-    const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR';
-    if (status >= 500 && !config.silent) console.error(JSON.stringify({level:'error',request_id:c.get('requestId'),method:c.req.method,path:c.req.path,status}));
-    return c.json({error:{code,message:status >= 500 && !(error instanceof ApiError && status === 503) ? 'ระบบเกิดข้อผิดพลาด กรุณาลองใหม่' : error.message,request_id:c.get('requestId')}},status);
-  });
+  app.onError((error,c) => errorResponse(error,c,config.silent));
   return app;
 }

@@ -12,7 +12,8 @@ export function clientIp(remote:string|undefined,forwarded:string|undefined,trus
   const chain=forwarded.split(',').map(ip=>ip.trim());
   // Fail closed to the socket address for malformed or excessively long chains.
   if(chain.length>20||chain.some(ip=>!isIP(ip))) return address;
-  for(const ip of chain.reverse()) {
+  chain.reverse();
+  for(const ip of chain) {
     if(!trusted.has(address)) break;
     address=normalize(ip);
   }

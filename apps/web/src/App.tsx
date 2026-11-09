@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   ArrowDown, ArrowRight, ArrowUp, Bell, CalendarDays, Check, CheckCheck, ChevronDown,
-  BookOpen, Circle, ClipboardPenLine, Clock3, Copy, Crosshair, FileStack, FileText,
+  BookOpen, Circle, ClipboardPenLine, Clock3, Copy, Crosshair, FileStack,
   GitBranch, KeyRound, LayoutGrid, ListTodo, LoaderCircle, MoreHorizontal,
   MessageCircle, NotebookPen, Pencil, Plus, RefreshCw, Search, ShieldCheck, Sparkles,
   Trash2, UsersRound, Waypoints, X,

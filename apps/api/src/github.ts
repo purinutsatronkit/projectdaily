@@ -1,16 +1,16 @@
 import {randomUUID} from 'node:crypto';
 import {Hono} from 'hono';
 import {z} from 'zod';
-import {ApiError,get,now,parseBody,type Config,type Env} from './context.ts';
+import {all,ApiError,get,now,parseBody,type Config,type Env} from './context.ts';
 import {seal,unseal} from './social-config.ts';
 import {exchange,tokenPayload} from './social.ts';
 import type {Database} from './db.ts';
 import {recordTaskActivity} from './task-activity.ts';
-import {all} from './context.ts';
 
 const segment=z.string().min(1).max(100).regex(/^[A-Za-z0-9_.-]+$/).refine(v=>v!=='.'&&v!=='..');
 const numberId=z.string().regex(/^[1-9]\d{0,18}$/);
-const refSchema=z.string().min(1).max(255).refine(v=>!/[\x00-\x1f]/.test(v));
+const hasAsciiControl = (value: string) => Array.from(value).some(character => character.charCodeAt(0) < 32);
+const refSchema=z.string().min(1).max(255).refine(v=>!hasAsciiControl(v));
 const inputsSchema=z.record(z.string().min(1).max(100),z.union([z.string().max(2000),z.boolean(),z.number()])).refine(v=>Object.keys(v).length<=25);
 export function githubRoutes(db:Database,config:Config) {
   const routes=new Hono<Env>(),refreshing=new Map<string,Promise<string>>();
@@ -121,7 +121,7 @@ export function githubRoutes(db:Database,config:Config) {
       limited:{reviews:reviews.status==='rejected',files:files.status==='rejected',checks:checks.status==='rejected'}});
   });
   routes.get('/repos/:owner/:repo/files',async c=>{
-    const path=parse(z.string().max(2000).refine(v=>!v.split('/').some(p=>p==='.'||p==='..')&&!/[\x00-\x1f\\]/.test(v)),c.req.query('path')??'');
+    const path=parse(z.string().max(2000).refine(v=>!v.split('/').some(p=>p==='.'||p==='..')&&!hasAsciiControl(v)&&!v.includes('\\')),c.req.query('path')??'');
     const ref=parse(refSchema,c.req.query('ref'));
     const result=await api(c.get('user').id,`${base(c.req.param('owner'),c.req.param('repo'))}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(ref)}`);
     if(Array.isArray(result)) return c.json({kind:'directory',entries:result.map(({name,path,type,size}:any)=>({name,path,type,size})),limited:result.length>=1000});
