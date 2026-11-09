@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parents[3]
 SOURCE = ROOT / 'tmp' / 'video-presentation'
 OUTPUT = ROOT / 'artifacts'
 FONT = 'Leelawadee UI'
+HEADING_ONE = 'Heading 1'
+HEADING_TWO = 'Heading 2'
+WORD_VALUE_ATTRIBUTE = qn('w:val')
 
 
 def fonts(obj, size=None, bold=None, color='000000'):
@@ -37,7 +40,7 @@ def fonts(obj, size=None, bold=None, color='000000'):
     if lang is None:
         lang = OxmlElement('w:lang')
         rpr.append(lang)
-    lang.set(qn('w:val'), 'th-TH')
+    lang.set(WORD_VALUE_ATTRIBUTE, 'th-TH')
     lang.set(qn('w:eastAsia'), 'th-TH')
     lang.set(qn('w:bidi'), 'th-TH')
     if size is not None:
@@ -45,7 +48,7 @@ def fonts(obj, size=None, bold=None, color='000000'):
         if sizecs is None:
             sizecs = OxmlElement('w:szCs')
             rpr.append(sizecs)
-        sizecs.set(qn('w:val'), str(round(size * 2)))
+        sizecs.set(WORD_VALUE_ATTRIBUTE, str(round(size * 2)))
 
 
 def base_document():
@@ -59,7 +62,7 @@ def base_document():
     s.right_margin = Inches(.9)
     s.header_distance = Inches(.3)
     s.footer_distance = Inches(.3)
-    for name in ('Normal', 'Title', 'Subtitle', 'Heading 1', 'Heading 2', 'Heading 3'):
+    for name in ('Normal', 'Title', 'Subtitle', HEADING_ONE, HEADING_TWO, 'Heading 3'):
         fonts(doc.styles[name], 11.5)
         pf = doc.styles[name].paragraph_format
         pf.widow_control = True
@@ -72,12 +75,12 @@ def base_document():
     doc.styles['Title'].paragraph_format.space_after = Pt(9)
     fonts(doc.styles['Subtitle'], 10, False)
     doc.styles['Subtitle'].paragraph_format.space_after = Pt(12)
-    fonts(doc.styles['Heading 1'], 15, True)
-    doc.styles['Heading 1'].paragraph_format.space_before = Pt(13)
-    doc.styles['Heading 1'].paragraph_format.space_after = Pt(7)
-    fonts(doc.styles['Heading 2'], 12.5, True)
-    doc.styles['Heading 2'].paragraph_format.space_before = Pt(9)
-    doc.styles['Heading 2'].paragraph_format.space_after = Pt(5)
+    fonts(doc.styles[HEADING_ONE], 15, True)
+    doc.styles[HEADING_ONE].paragraph_format.space_before = Pt(13)
+    doc.styles[HEADING_ONE].paragraph_format.space_after = Pt(7)
+    fonts(doc.styles[HEADING_TWO], 12.5, True)
+    doc.styles[HEADING_TWO].paragraph_format.space_before = Pt(9)
+    doc.styles[HEADING_TWO].paragraph_format.space_after = Pt(5)
     fonts(doc.styles['Heading 3'], 11.5, True)
     for style in doc.styles:
         for border in list(style._element.iter(qn('w:pBdr'))):
@@ -119,11 +122,25 @@ def add_table(doc, lines):
     widths = [1.62, 3.05, 2.03] if data[0][0] == 'โครงการ' else [1.45, 2.55, 2.7]
     for col, width in zip(table.columns, widths):
         col.width = Inches(width)
-    props = table._tbl.tblPr
+    style_table_properties(table._tbl.tblPr)
+    for ri, row in enumerate(table.rows):
+        trpr = row._tr.get_or_add_trPr()
+        trpr.append(OxmlElement('w:cantSplit'))
+        if ri == 0:
+            trpr.append(OxmlElement('w:tblHeader'))
+        style_table_row(row, data[ri], widths, ri)
+    spacer = doc.add_paragraph()
+    spacer.paragraph_format.space_after = Pt(3)
+    spacer.paragraph_format.space_before = Pt(0)
+    spacer.paragraph_format.line_spacing = Pt(3)
+    return table
+
+
+def style_table_properties(props):
     borders = OxmlElement('w:tblBorders')
     for key in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
         el = OxmlElement('w:' + key)
-        el.set(qn('w:val'), 'single')
+        el.set(WORD_VALUE_ATTRIBUTE, 'single')
         el.set(qn('w:sz'), '5')
         el.set(qn('w:color'), 'D9D9D9')
         borders.append(el)
@@ -135,28 +152,23 @@ def add_table(doc, lines):
         el.set(qn('w:type'), 'dxa')
         margin.append(el)
     props.append(margin)
-    for ri, row in enumerate(table.rows):
-        trpr = row._tr.get_or_add_trPr()
-        no_split = OxmlElement('w:cantSplit')
-        trpr.append(no_split)
-        if ri == 0:
-            repeat = OxmlElement('w:tblHeader')
-            trpr.append(repeat)
-        for ci, cell in enumerate(row.cells):
-            cell.width = Inches(widths[ci])
-            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-            p = cell.paragraphs[0]
-            p.paragraph_format.space_after = Pt(0)
-            p.paragraph_format.space_before = Pt(0)
-            p.paragraph_format.line_spacing = 1.08
-            run = p.add_run(data[ri][ci])
-            fonts(run, 10.5, ri == 0, 'FFFFFF' if ri == 0 else '000000')
-            shade(cell, '1F4E78' if ri == 0 else ('F2F6FA' if ri % 2 else 'FFFFFF'))
-    spacer = doc.add_paragraph()
-    spacer.paragraph_format.space_after = Pt(3)
-    spacer.paragraph_format.space_before = Pt(0)
-    spacer.paragraph_format.line_spacing = Pt(3)
-    return table
+
+
+def style_table_row(row, values, widths, index):
+    header = index == 0
+    fill = 'F2F6FA' if index % 2 else 'FFFFFF'
+    if header:
+        fill = '1F4E78'
+    for ci, cell in enumerate(row.cells):
+        cell.width = Inches(widths[ci])
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        p = cell.paragraphs[0]
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.space_before = Pt(0)
+        p.paragraph_format.line_spacing = 1.08
+        run = p.add_run(values[ci])
+        fonts(run, 10.5, header, 'FFFFFF' if header else '000000')
+        shade(cell, fill)
 
 
 def markdown(doc, text, report=False):
@@ -174,23 +186,26 @@ def markdown(doc, text, report=False):
                 index += 1
             add_table(doc, block)
             continue
-        if line.startswith('# '):
-            doc.add_paragraph(line[2:], 'Title')
-        elif line.startswith('## '):
-            heading = line[3:]
-            p = doc.add_paragraph(heading, 'Heading 1')
-            if report and heading == 'บทสรุปแบบขยาย':
-                p.paragraph_format.page_break_before = True
-                p.paragraph_format.space_before = Pt(0)
-        elif line.startswith('### '):
-            heading = line[4:]
-            heading = heading.replace('ระบบจองแบบ Booking.com', 'ระบบจอง')
-            doc.add_paragraph(heading, 'Heading 2')
-        elif line.startswith('จัดทำวันที่') or line.startswith('ระยะเวลาประมาณ'):
-            add_body(doc, line, 'Subtitle')
-        else:
-            add_body(doc, line)
+        add_markdown_paragraph(doc, line, report)
         index += 1
+
+
+def add_markdown_paragraph(doc, line, report):
+    if line.startswith('# '):
+        doc.add_paragraph(line[2:], 'Title')
+    elif line.startswith('## '):
+        heading = line[3:]
+        p = doc.add_paragraph(heading, HEADING_ONE)
+        if report and heading == 'บทสรุปแบบขยาย':
+            p.paragraph_format.page_break_before = True
+            p.paragraph_format.space_before = Pt(0)
+    elif line.startswith('### '):
+        heading = line[4:].replace('ระบบจองแบบ Booking.com', 'ระบบจอง')
+        doc.add_paragraph(heading, HEADING_TWO)
+    elif line.startswith(('จัดทำวันที่', 'ระยะเวลาประมาณ')):
+        add_body(doc, line, 'Subtitle')
+    else:
+        add_body(doc, line)
 
 
 def build_report():
@@ -207,11 +222,11 @@ def build_scripts():
     doc = base_document()
     doc.add_paragraph('สคริปต์พูดประกอบรายงานและสไลด์นำเสนอ', 'Title')
     doc.add_paragraph('ระบบอัตโนมัติด้วย n8n และ AI และการออกแบบซอฟต์แวร์', 'Subtitle')
-    doc.add_paragraph('ภาคที่ 1 สคริปต์พูดประกอบรายงาน', 'Heading 1')
+    doc.add_paragraph('ภาคที่ 1 สคริปต์พูดประกอบรายงาน', HEADING_ONE)
     report_text = (SOURCE / 'report-speech.md').read_text(encoding='utf-8-sig')
     report_text = re.sub(r'^# .*\n+', '', report_text)
     markdown(doc, report_text)
-    p = doc.add_paragraph('ภาคที่ 2 สคริปต์พูดประกอบสไลด์', 'Heading 1')
+    p = doc.add_paragraph('ภาคที่ 2 สคริปต์พูดประกอบสไลด์', HEADING_ONE)
     p.paragraph_format.page_break_before = True
     p.paragraph_format.space_before = Pt(0)
     data = json.loads((SOURCE / 'slide-scripts.json').read_text(encoding='utf-8-sig'))
@@ -230,7 +245,7 @@ def build_scripts():
         seconds = slide.get('seconds', 0)
         duration = f'{seconds} วินาที' if seconds else ''
         heading = f'สไลด์ที่ {number} {title}'.replace(':', '')
-        doc.add_paragraph(heading, 'Heading 2')
+        doc.add_paragraph(heading, HEADING_TWO)
         if duration:
             p = add_body(doc, f'เวลาพูดประมาณ {duration}', 'Subtitle')
             p.paragraph_format.keep_with_next = True
