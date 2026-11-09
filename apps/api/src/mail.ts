@@ -16,7 +16,7 @@ function emailLinkFallback(url:string){return `<p style="margin:20px 0 6px;color
 export function trustedPublicUrl(value: string, production = false) {
   const url = new URL(value);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
-    throw new Error('APP_PUBLIC_URL must be a website origin such as http://localhost:5173 or https://tasks.example.com');
+    throw new Error('APP_PUBLIC_URL must be a website origin such as http://localhost:5174 or https://tasks.example.com');
   }
   if (production && url.protocol !== 'https:') throw new Error('Production APP_PUBLIC_URL must use HTTPS.');
   return url.origin;
@@ -58,7 +58,7 @@ export function resetEmailFromEnvironment(env: NodeJS.ProcessEnv = process.env):
   const address = env.SMTP_FROM?.trim() || user;
   if (!z.email().safeParse(user).success || !z.email().safeParse(address).success) throw new Error('SMTP_USER and SMTP_FROM must be email addresses.');
   const production = env.NODE_ENV === 'production';
-  const publicUrl = trustedPublicUrl(env.APP_PUBLIC_URL || env.APP_ORIGIN || 'http://localhost:5173', production);
+  const publicUrl = trustedPublicUrl(env.APP_PUBLIC_URL || env.APP_ORIGIN || 'http://localhost:5174', production);
   const host = env.SMTP_HOST?.trim() || 'smtp.gmail.com';
   const port = Number(env.SMTP_PORT || 465);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('SMTP_PORT is invalid.');

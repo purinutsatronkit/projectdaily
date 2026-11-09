@@ -264,7 +264,7 @@ function Guide() {
 }
 
 function Integrations({ notify, onGuide }: { notify: (notice: Notice) => void; onGuide: () => void }) {
-  const exampleRequest = 'curl -H "x-api-key: YOUR_API_KEY" "http://localhost:3000/api/integrations/due-tasks"';
+  const exampleRequest = 'curl -H "x-api-key: YOUR_API_KEY" "http://localhost:3001/api/integrations/due-tasks"';
   const [keys, setKeys] = useState<ApiKey[]>([]); const [reminders, setReminders] = useState<Reminder[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [revision, setRevision] = useState(0);
   const [reminderSettings,setReminderSettings]=useState<{available:boolean;verified:boolean;schedule:string}|null>(null);
   const [name, setName] = useState(''); const [creating, setCreating] = useState(false); const [secret, setSecret] = useState(''); const [revoke, setRevoke] = useState<ApiKey | null>(null); const [revoking, setRevoking] = useState(false);

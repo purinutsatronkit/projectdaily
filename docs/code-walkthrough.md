@@ -86,7 +86,7 @@ PATCH แก้เฉพาะ fields ที่ส่งมา ตัวอย�
 
 Tailwind เป็น utility classes สำหรับจัด layout สี ระยะห่าง และ responsive แทนการเขียน CSS แยกทุก component สีในงานนี้กำหนดจากภาพอ้างอิงของผู้ใช้
 
-ใน dev Vite proxy ส่ง `/api` ไป Hono ที่ port 3000 Browser จึงเรียก URL ของเว็บตัวเอง หลัง build Hono เสิร์ฟทั้งไฟล์ frontend และ API จาก origin เดียว
+ใน dev Vite proxy ส่ง `/api` ไป Hono ที่ port 3001 Browser จึงเรียก URL ของเว็บตัวเอง หลัง build Hono เสิร์ฟทั้งไฟล์ frontend และ API จาก origin เดียว
 
 ฟอร์มวันที่อ่านค่าจริงจาก input ผ่าน FormData ตอน submit และรับ onInput/onChange เพื่อไม่ให้ค่าที่ผู้ใช้เลือกหายระหว่างการอัปเดต state การทดสอบผ่านหน้าเว็บเป็นตัวที่ช่วยพบปัญหานี้ แม้ typecheck จะผ่านก็ตาม
 

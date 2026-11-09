@@ -25,9 +25,9 @@ const db = process.env.TURSO_DATABASE_URL
   : openDatabase(resolve(root,process.env.DATABASE_PATH ?? './data/taskflow.sqlite'));
 const app = createApp(db,{secret:process.env.JWT_SECRET ?? '',production,passwordReset,dailyEmailEnabled,social:socialFromEnvironment(),
   assistant:{key:process.env.GEMINI_API_KEY?.trim(),model:process.env.GEMINI_MODEL?.trim()||undefined},
-  origins:[process.env.APP_ORIGIN ?? 'http://localhost:5173',...(!production ? [
-    'http://localhost:5173','http://127.0.0.1:5173',
-    'http://localhost:3000','http://127.0.0.1:3000',
+  origins:[process.env.APP_ORIGIN ?? 'http://localhost:5174',...(!production ? [
+    'http://localhost:5174','http://127.0.0.1:5174',
+    'http://localhost:3001','http://127.0.0.1:3001',
   ] : [])],
   clientIp:c => clientIp(getConnInfo(c).remote.address,c.req.header('x-forwarded-for'),proxies)});
 const publicPath = resolve(root,'apps/web/dist');
@@ -35,7 +35,7 @@ if (existsSync(publicPath)) {
   app.get('*',async(c,next) => c.req.path.startsWith('/api/') ? next() : serveStatic({root:publicPath})(c,next));
   app.get('*',async(c,next) => c.req.path.startsWith('/api/') ? next() : serveStatic({path:resolve(publicPath,'index.html')})(c,next));
 }
-const port = Number(process.env.PORT ?? 3000), hostname = process.env.HOST ?? '127.0.0.1';
+const port = Number(process.env.PORT ?? 3001), hostname = process.env.HOST ?? '127.0.0.1';
 const server = serve({fetch:app.fetch,port,hostname},() => console.log(`TaskFlow API ready: http://localhost:${port}`));
 const stopReminders=passwordReset&&dailyEmailEnabled?startDailyReminderScheduler(db,mail=>passwordReset.sendTaskReminder(mail)):()=>{};
 async function stop() { await stopReminders(); server.close(() => { db.close(); process.exit(0); }); }

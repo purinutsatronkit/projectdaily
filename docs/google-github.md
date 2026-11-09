@@ -4,7 +4,7 @@ TaskFlow เข้าระบบด้วย Google หรืออีเมล
 
 ## เริ่มใช้กับค่าที่ตั้งไว้แล้ว
 
-1. หยุด dev server เดิมด้วย Ctrl+C แล้วรัน `npm.cmd run dev` จาก `D:\project` เปิด `http://localhost:5173` ให้ตรงกับ APP_PUBLIC_URL อย่าสลับเป็น 127.0.0.1 ระหว่าง OAuth
+1. หยุด dev server เดิมด้วย Ctrl+C แล้วรัน `npm.cmd run dev` จาก `D:\project` เปิด `http://localhost:5174` ให้ตรงกับ APP_PUBLIC_URL อย่าสลับเป็น 127.0.0.1 ระหว่าง OAuth
 2. ถ้ามีบัญชี TaskFlow และงานเดิมแล้ว ให้เข้าด้วยรหัสผ่านก่อน ไปตั้งค่าบัญชีแล้วกด **เชื่อม Google** ครั้งเดียว หลังจากนั้นเข้าด้วยปุ่ม Google ได้ ระบบไม่รวมบัญชีอัตโนมัติเพียงเพราะอีเมลตรงกัน
 3. ผู้ใช้ใหม่กด **เข้าสู่ระบบด้วย Google** ที่กล่อง login ได้เลย ระบบสร้างบัญชี TaskFlow หลัง Google ยืนยันอีเมล
 4. ในตั้งค่าบัญชี กด **เชื่อม GitHub** แล้วอนุญาตแอป จากนั้นกด **ติดตั้งหรือเลือก repository ที่ GitHub App เข้าถึงได้** และเลือก repository ที่ต้องการ การ authorize ผู้ใช้กับการ install แอปเป็นคนละขั้นตอน ต้องครบทั้งสอง
@@ -16,8 +16,8 @@ TaskFlow เข้าระบบด้วย Google หรืออีเมล
 ## ตัวแปรใน .env
 
 ```dotenv
-APP_ORIGIN=http://localhost:5173
-APP_PUBLIC_URL=http://localhost:5173
+APP_ORIGIN=http://localhost:5174
+APP_PUBLIC_URL=http://localhost:5174
 GOOGLE_CLIENT_ID=<Google Web application client ID>
 GOOGLE_CLIENT_SECRET=<Google client secret>
 GITHUB_CLIENT_ID=<GitHub App client ID ไม่ใช่ App ID>
@@ -35,8 +35,8 @@ OAUTH_TOKEN_KEY=<ค่าสุ่ม 64 ตัวอักษร hex>
 ## Google OAuth
 
 - Google Auth Platform → Clients → Web application
-- Authorized JavaScript origin: `http://localhost:5173`
-- Authorized redirect URI: **`http://localhost:5173/api/auth/google/callback`**
+- Authorized JavaScript origin: `http://localhost:5174`
+- Authorized redirect URI: **`http://localhost:5174/api/auth/google/callback`**
 - ตั้งชื่อแอป อีเมลติดต่อ และ audience ให้ครบ หาก console จำกัดการทดสอบ ให้เพิ่มบัญชี Google ที่จะใช้ใน Test users
 - ใช้เฉพาะ `openid email profile` สำหรับ login ไม่มีสิทธิ์ Google Drive
 - หากพบ redirect_uri_mismatch ตรวจ protocol, host, port และ path ให้ตรงทุกตัว
@@ -45,8 +45,8 @@ OAUTH_TOKEN_KEY=<ค่าสุ่ม 64 ตัวอักษร hex>
 
 เปิด Settings → Developer settings → GitHub Apps → แอปของคุณ
 
-- Homepage URL: `http://localhost:5173`
-- Redirect URI / Callback URL: **`http://localhost:5173/api/auth/github/callback`**
+- Homepage URL: `http://localhost:5174`
+- Redirect URI / Callback URL: **`http://localhost:5174/api/auth/github/callback`**
 - Credentials → Client secrets → Generate a new client secret แล้วคัดลอกลง .env
 - เปิด Expire user authorization tokens; ระบบ refresh token ที่เข้ารหัสไว้เมื่อใกล้หมดอายุ
 - Request user authorization during installation: ปิดได้ เพราะเชื่อมผู้ใช้ผ่านปุ่มใน TaskFlow แยกต่างหาก
@@ -95,8 +95,8 @@ TaskFlow เก็บประวัติคำสั่งที่ GitHub ร
 - งานแต่ละชิ้นแนบลิงก์ GitHub Issue/PR ได้ สถานะในหน้าแก้ไขงานอาศัยสิทธิ์ Issues/Pull requests read หากไม่ได้สิทธิ์ ยังเปิดลิงก์บน GitHub ได้
 - ประวัติคำสั่ง pipeline ในหน้า GitHub แสดง 50 รายการล่าสุดต่อบัญชี ไม่เก็บ workflow inputs
 - ยกเลิกการเชื่อมใน TaskFlow ลบ token ที่เก็บในแอป หากต้องการเพิกถอนสิทธิ์บน GitHub ด้วย ให้ไป GitHub Settings → Applications เพื่อ revoke authorization/uninstall ด้วยตัวเอง
-- หลังแก้ .env ต้องรีสตาร์ท API หาก port 5173 ถูกใช้ ให้หยุด dev server เดิมก่อนเปิดใหม่
-- ใช้ `npm.cmd run build` แล้ว `npm.cmd start` ที่ port 3000 ต้องเปลี่ยน APP_ORIGIN, APP_PUBLIC_URL และ redirect URIs ทั้งสอง provider ให้ตรง port 3000 ก่อน สำหรับ production ใช้ HTTPS, NODE_ENV=production และค่า domain จริง
+- หลังแก้ .env ต้องรีสตาร์ท API หาก port 5174 ถูกใช้ ให้หยุด dev server เดิมก่อนเปิดใหม่
+- ใช้ `npm.cmd run build` แล้ว `npm.cmd start` ที่ port 3001 ต้องเปลี่ยน APP_ORIGIN, APP_PUBLIC_URL และ redirect URIs ทั้งสอง provider ให้ตรง port 3001 ก่อน สำหรับ production ใช้ HTTPS, NODE_ENV=production และค่า domain จริง
 - OAuth state ใช้ได้ครั้งเดียว อายุ 10 นาที ผูกกับ browser และ session ของผู้เชื่อม Token GitHub เข้ารหัสด้วย AES-256-GCM ในฐานข้อมูล Session TaskFlow ยังมีอายุ 5 ชั่วโมงตามเดิม
 
 เอกสารอ้างอิง: [Google OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect), [GitHub App user access token](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app), [GitHub App Credentials UI](https://github.blog/changelog/2026-10-13-github-app-improvements-for-least-privilege-and-management/)
