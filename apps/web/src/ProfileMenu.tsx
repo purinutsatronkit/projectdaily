@@ -22,7 +22,10 @@ export default function ProfileMenu({ user, onNavigate, onLogout, loggingOut }: 
     event.preventDefault();
     const items=Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') || []);
     const index=items.indexOf(document.activeElement as HTMLButtonElement);
-    const next=event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowDown'?1:-1)+items.length)%items.length;
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    let next = (index + step + items.length) % items.length;
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = items.length - 1;
     items[next]?.focus();
   }
   function navigate(view:'account'|'integrations') { close(); onNavigate(view); }

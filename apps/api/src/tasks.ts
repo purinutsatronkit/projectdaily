@@ -105,8 +105,10 @@ export function taskRoutes(db: Database) {
   return routes;
 }
 export async function readSummary(db: Database, userId: string,projectId?:string) {
+  let projectFilter = '';
+  if (projectId) projectFilter = projectId === 'unassigned' ? 'AND project_id IS NULL' : 'AND project_id=?';
   return await get<Summary>(db, `SELECT COUNT(*) total,
     COALESCE(SUM(status='pending'),0) pending,COALESCE(SUM(status='in_progress'),0) in_progress,
     COALESCE(SUM(status='completed'),0) completed,
-    COALESCE(SUM(status!='completed' AND due_date<?),0) overdue FROM tasks WHERE user_id=? ${projectId?projectId==='unassigned'?'AND project_id IS NULL':'AND project_id=?':''}`, bangkokDate(),userId,...(projectId&&projectId!=='unassigned'?[projectId]:[]))!;
+    COALESCE(SUM(status!='completed' AND due_date<?),0) overdue FROM tasks WHERE user_id=? ${projectFilter}`, bangkokDate(),userId,...(projectId&&projectId!=='unassigned'?[projectId]:[]))!;
 }

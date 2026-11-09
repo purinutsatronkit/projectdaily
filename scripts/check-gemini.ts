@@ -30,7 +30,7 @@ else{
     else{
       const body=await response.json().catch(()=>({})) as {error?:{status?:string;message?:string}};
       const safe=String(body.error?.message??'').replaceAll(key,'[redacted]').slice(0,350);
-      console.error(`Gemini HTTP ${response.status} (${body.error?.status??'unknown'}), model: ${model}${safe?`\n${safe}`:''}`);
+      console.error(`Gemini HTTP ${response.status} (${body.error?.status??'unknown'}), model: ${model}${safe?'\n' + safe:''}`);
       process.exitCode=1;
     }
   }catch(error){console.error(`Gemini connection failed: ${error instanceof Error?error.name:'unknown'}`);process.exitCode=1;}

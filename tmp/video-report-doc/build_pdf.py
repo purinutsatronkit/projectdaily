@@ -46,10 +46,23 @@ def measured(text: str, bold: bool, size: float):
     return shaped, width
 
 
+def external_link(url: str, bold: bool) -> Run:
+    label = 'เปิดวิดีโอต้นฉบับ' if 'youtube.com/' in url or 'youtu.be/' in url else 'เปิดบทความต้นฉบับ'
+    return Run(label, bold, url)
+
+
+INLINE_TOKENS = (
+    r'\*\*.*?\*\*',
+    r'\[[^\]]+\]\(https?://[^)]+\)',
+    r'https?://[^\s<>]+',
+    r'`[^`]+`',
+)
+INLINE_PATTERN = re.compile('(' + '|'.join(INLINE_TOKENS) + ')')
+
+
 def inline(text: str, bold: bool = False) -> list[Run]:
     text = text.replace('–', '-').replace('—', '-').replace('\u2011', '-')
-    pattern = re.compile(r'(\*\*.*?\*\*|\[[^\]]+\]\(https?://[^)]+\)|https?://[^\s<>]+|`[^`]+`)')
-    parts = pattern.split(text)
+    parts = INLINE_PATTERN.split(text)
     out = []
     for part in parts:
         if not part:
@@ -59,9 +72,8 @@ def inline(text: str, bold: bool = False) -> list[Run]:
         elif part.startswith('[') and '](' in part and part.endswith(')'):
             label, url = part[1:-1].split('](', 1)
             out.append(Run(label, bold, url))
-        elif part.startswith('http://') or part.startswith('https://'):
-            label = 'เปิดวิดีโอต้นฉบับ' if 'youtube.com/' in part or 'youtu.be/' in part else 'เปิดบทความต้นฉบับ'
-            out.append(Run(label, bold, part))
+        elif part.startswith(('http://', 'https://')):
+            out.append(external_link(part, bold))
         elif part.startswith('`') and part.endswith('`'):
             out.append(Run(part[1:-1], bold))
         else:
@@ -82,6 +94,57 @@ def coalesce(runs):
     return result
 
 
+def character_clusters(token):
+    clusters = []
+    for character in token:
+        if clusters and unicodedata.combining(character):
+            clusters[-1] += character
+        else:
+            clusters.append(character)
+    return clusters
+
+
+def append_long_token(token, run, size, line_width, result, line, used):
+    for cluster in character_clusters(token):
+        width = measured(cluster, run.bold, size)[1]
+        if used + width > line_width and line:
+            result.append(coalesce(line))
+            line, used = [], 0
+        line.append(Run(cluster, run.bold, run.url))
+        used += width
+    return line, used
+
+
+def tokenize_runs(runs):
+    for run in runs:
+        for token in word_tokenize(run.text, engine='newmm', keep_whitespace=True):
+            yield run, token
+
+
+def wrap_runs(runs, size, line_width):
+    result = []
+    line, used = [], 0
+    for run, token in tokenize_runs(runs):
+        if token == '\n':
+            result.append(coalesce(line))
+            line, used = [], 0
+            continue
+        width = measured(token, run.bold, size)[1]
+        if used + width > line_width + 0.05 and line:
+            result.append(coalesce(line))
+            line, used = [], 0
+            if token.isspace():
+                continue
+        if width > line_width:
+            line, used = append_long_token(token, run, size, line_width, result, line, used)
+            continue
+        line.append(Run(token, run.bold, run.url))
+        used += width
+    if line:
+        result.append(coalesce(line))
+    return result or [[]]
+
+
 class ThaiText(Flowable):
     def __init__(self, text='', *, runs=None, size=12, leading=20, bold=False,
                  marker=None, after=7, before=0, keep=False, lines=None, indent=None):
@@ -91,63 +154,27 @@ class ThaiText(Flowable):
         self.leading = leading
         self.bold = bold
         self.marker = marker
-        self.indent = (22 if marker else 0) if indent is None else indent
+        default_indent = 22 if marker else 0
+        self.indent = default_indent if indent is None else indent
         self.spaceAfter = after
         self.spaceBefore = before
         self.keepWithNext = keep
         self._fixed_lines = lines
         self._lines = []
 
-    def wrap(self, availableWidth, availableHeight):
-        self.width = availableWidth
-        lineWidth = availableWidth - self.indent
-        if self._fixed_lines is not None:
-            self._lines = self._fixed_lines
+    def wrap(self, available_width, available_height):
+        self.width = available_width
+        if self._fixed_lines is None:
+            self._lines = wrap_runs(self.runs, self.size, available_width - self.indent)
         else:
-            line = []
-            used = 0
-            result = []
-            for run in self.runs:
-                tokens = word_tokenize(run.text, engine='newmm', keep_whitespace=True)
-                for token in tokens:
-                    if token == '\n':
-                        result.append(coalesce(line))
-                        line, used = [], 0
-                        continue
-                    width = measured(token, run.bold, self.size)[1]
-                    if used + width > lineWidth + 0.05 and line:
-                        result.append(coalesce(line))
-                        line, used = [], 0
-                        if token.isspace():
-                            continue
-                    if width <= lineWidth:
-                        line.append(Run(token, run.bold, run.url))
-                        used += width
-                    else:
-                        # Emergency wrapping is used only for long unbroken Latin tokens.
-                        clusters = []
-                        for char in token:
-                            if clusters and unicodedata.combining(char):
-                                clusters[-1] += char
-                            else:
-                                clusters.append(char)
-                        for cluster in clusters:
-                            cw = measured(cluster, run.bold, self.size)[1]
-                            if used + cw > lineWidth and line:
-                                result.append(coalesce(line))
-                                line, used = [], 0
-                            line.append(Run(cluster, run.bold, run.url))
-                            used += cw
-            if line:
-                result.append(coalesce(line))
-            self._lines = result or [[]]
+            self._lines = self._fixed_lines
         self.height = self.leading * len(self._lines)
         return self.width, self.height
 
-    def split(self, availableWidth, availableHeight):
+    def split(self, available_width, available_height):
         if not self._lines:
-            self.wrap(availableWidth, availableHeight)
-        count = int(availableHeight // self.leading)
+            self.wrap(available_width, available_height)
+        count = int(available_height // self.leading)
         if count < 2 or len(self._lines) - count < 1:
             return []
         if len(self._lines) - count == 1 and count > 2:
@@ -164,9 +191,9 @@ class ThaiText(Flowable):
             c.setFont('Thai', self.size)
             c.setFillColor(colors.black)
             c.drawString(0, self.height - self.size - 2, measured(self.marker, False, self.size)[0])
-        for lineIndex, line in enumerate(self._lines):
+        for line_index, line in enumerate(self._lines):
             x = self.indent
-            y = self.height - self.size - 2 - lineIndex * self.leading
+            y = self.height - self.size - 2 - line_index * self.leading
             for run in line:
                 c.setFont('ThaiBold' if run.bold else 'Thai', self.size)
                 c.setFillColor(BLUE if run.url else colors.black)
@@ -191,8 +218,8 @@ def table_from_lines(lines):
     else:
         fractions = [1 / ncols] * ncols
     data = []
-    for rowIndex, record in enumerate(records):
-        data.append([ThaiText(cell, size=11, leading=18, bold=rowIndex == 0, after=0) for cell in record])
+    for row_index, record in enumerate(records):
+        data.append([ThaiText(cell, size=11, leading=18, bold=row_index == 0, after=0) for cell in record])
     table = Table(data, colWidths=[width * f for f in fractions], repeatRows=1, hAlign='LEFT')
     table.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), .5, colors.HexColor('#D9D9D9')),
@@ -207,6 +234,28 @@ def table_from_lines(lines):
     table.spaceBefore = 6
     table.spaceAfter = 12
     return table
+
+
+def make_single_line_block(text):
+    heading = re.match(r'^(#{1,6})\s+(.+)$', text)
+    if heading:
+        level = len(heading.group(1))
+        if level == 1:
+            return ThaiText(heading.group(2), size=21, leading=31, bold=True, after=14, keep=True)
+        if level == 2:
+            return ThaiText(heading.group(2), size=16, leading=25, bold=True, before=12, after=9, keep=True)
+        return ThaiText(heading.group(2), size=13, leading=22, bold=True, before=9, after=6, keep=True)
+    if re.fullmatch(r'[-*_]{3,}', text):
+        return Spacer(1, 7)
+    numbered = re.match(r'^(\d+[.)])\s+(.+)$', text)
+    if numbered:
+        return ThaiText(numbered.group(2), marker=numbered.group(1), after=8)
+    bullet = re.match(r'^[-*]\s+(.+)$', text)
+    if bullet:
+        return ThaiText(bullet.group(1), marker='•', after=8)
+    if text.startswith('จัดทำวันที่'):
+        return ThaiText(text, size=10.5, leading=17, after=13)
+    return None
 
 
 def make_story(source):
@@ -225,36 +274,15 @@ def make_story(source):
                 i += 1
             story.append(table_from_lines(collected))
             continue
-        heading = re.match(r'^(#{1,6})\s+(.+)$', text)
-        if heading:
-            level = len(heading.group(1))
-            if level == 1:
-                story.append(ThaiText(heading.group(2), size=21, leading=31, bold=True, after=14, keep=True))
-            elif level == 2:
-                story.append(ThaiText(heading.group(2), size=16, leading=25, bold=True, before=12, after=9, keep=True))
-            else:
-                story.append(ThaiText(heading.group(2), size=13, leading=22, bold=True, before=9, after=6, keep=True))
-            i += 1
-            continue
-        if re.fullmatch(r'[-*_]{3,}', text):
-            story.append(Spacer(1, 7))
-            i += 1
-            continue
-        numbered = re.match(r'^(\d+[.)])\s+(.+)$', text)
-        bullet = re.match(r'^[-*]\s+(.+)$', text)
-        if numbered:
-            story.append(ThaiText(numbered.group(2), marker=numbered.group(1), after=8))
-        elif bullet:
-            story.append(ThaiText(bullet.group(1), marker='•', after=8))
-        elif text.startswith('จัดทำวันที่'):
-            story.append(ThaiText(text, size=10.5, leading=17, after=13))
-        else:
+        block = make_single_line_block(text)
+        if block is None:
             # Markdown hard-wrapped prose is kept as one paragraph.
             parts = [text]
             while i+1 < len(lines) and lines[i+1].strip() and not re.match(r'^(#|\||[-*]\s|\d+[.)]\s)', lines[i+1].strip()):
                 i += 1
                 parts.append(lines[i].strip())
-            story.append(ThaiText(' '.join(parts)))
+            block = ThaiText(' '.join(parts))
+        story.append(block)
         i += 1
     return story
 
