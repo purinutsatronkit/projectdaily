@@ -11,9 +11,11 @@ try {
   }
 } catch (error) {
   const code = (error && typeof error === 'object' && 'code' in error) ? String(error.code) : '';
-  const reason = code === 'EAUTH' ? 'Gmail rejected authentication. Check the sender account and Google App Password.'
-    : ['ECONNECTION', 'ETIMEDOUT', 'EDNS', 'ESOCKET'].includes(code) ? 'Cannot establish a secure SMTP connection. Check the network, SMTP host and port.'
-    : 'Check SMTP settings and APP_PUBLIC_URL; production needs HTTPS.';
+  let reason = 'Check SMTP settings and APP_PUBLIC_URL; production needs HTTPS.';
+  if (code === 'EAUTH') reason = 'Gmail rejected authentication. Check the sender account and Google App Password.';
+  else if (['ECONNECTION', 'ETIMEDOUT', 'EDNS', 'ESOCKET'].includes(code)) {
+    reason = 'Cannot establish a secure SMTP connection. Check the network, SMTP host and port.';
+  }
   console.error(`SMTP check failed. ${reason} See docs/password-reset-gmail.md`);
   // Do not print raw SMTP errors: providers may echo credentials or email addresses.
   process.exitCode = 1;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { CalendarDays, Download, Eye, FileText, LoaderCircle, RotateCcw, Save } from 'lucide-react';
 import type { Sk09DraftController } from './useSk09Draft';
 import { addDays, fiveDays, sk09Schema, thaiLongDate, type Sk09Data } from './sk09-model';
@@ -41,11 +41,18 @@ export default function Sk09Form({draft,projectId}:{draft:Sk09DraftController;pr
     } catch(err) {setError(err instanceof Error?err.message:'สร้าง PDF ไม่สำเร็จ กรุณาลองใหม่');}
     finally {setBusy(false);busyRef.current=false;}
   }
-  function submit(event:FormEvent) {event.preventDefault();void generate(true);}
+  function submit(event:SubmitEvent) {event.preventDefault();void generate(true);}
+  function draftStatus() {
+    if (!draft.ready) return ('กำลังโหลดร่าง');
+    if (draft.saving) return ('กำลังบันทึกร่าง…');
+    if (draft.dirty) return ('มีการแก้ไขที่ยังไม่บันทึก');
+    if (draft.savedAt) return (`บันทึกร่างแล้ว · ${new Date(draft.savedAt).toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})}`);
+    return ('เริ่มกรอกเพื่อบันทึกร่างอัตโนมัติ');
+  }
   return <div>
     <div className="page-intro"><p className="eyebrow">Cooperative education</p><h1 className="page-title">บันทึกสหกิจศึกษา สก.09<span className="text-[#a66a5f]">.</span></h1><p className="page-description">กรอกข้อมูลรายสัปดาห์ 5 วัน แล้วดาวน์โหลดเป็น PDF ตามแบบฟอร์ม</p></div>
     <div className="panel mt-6 flex flex-wrap items-center justify-between gap-4 p-5">
-      <div><p role="status" className="text-sm font-medium text-teal-800">{!draft.ready?'กำลังโหลดร่าง':draft.saving?'กำลังบันทึกร่าง…':draft.dirty?'มีการแก้ไขที่ยังไม่บันทึก':draft.savedAt?`บันทึกร่างแล้ว · ${new Date(draft.savedAt).toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})}`:'เริ่มกรอกเพื่อบันทึกร่างอัตโนมัติ'}</p><p className="mt-1 text-xs leading-6 text-slate-500">เก็บร่างล่าสุด 1 ฉบับในบัญชีของคุณ กรอกไม่ครบก็เก็บไว้ได้ และเปิดต่อจากเครื่องอื่นได้</p>
+      <div><p role="status" className="text-sm font-medium text-teal-800">{draftStatus()}</p><p className="mt-1 text-xs leading-6 text-slate-500">เก็บร่างล่าสุด 1 ฉบับในบัญชีของคุณ กรอกไม่ครบก็เก็บไว้ได้ และเปิดต่อจากเครื่องอื่นได้</p>
       {draft.error&&<div role="alert" className="mt-2 text-sm text-red-700">{draft.error}<button type="button" className="ml-2 underline" disabled={draft.saving} onClick={()=>{if(!draft.dirty||window.confirm('โหลดร่างจากระบบแทนข้อความที่ยังไม่บันทึกในหน้านี้?')) {setPreview('');draft.reload();}}}>โหลดร่างล่าสุด</button></div>}</div>
       <div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary" disabled={!draft.ready||draft.saving} onClick={clearForm}><RotateCcw size={18}/>ล้างข้อมูลทั้งแบบฟอร์ม</button><button type="button" className="btn-secondary" disabled={!draft.ready||draft.saving||!draft.dirty} onClick={() => { draft.save().catch(() => {}); }}><Save size={18}/>บันทึกร่าง</button></div>
     </div>
@@ -63,10 +70,10 @@ export default function Sk09Form({draft,projectId}:{draft:Sk09DraftController;pr
       </fieldset>
       <fieldset disabled={busy} className="panel overflow-hidden"><legend className="sr-only">บันทึกงานรายวัน</legend><div className="border-b border-slate-100 p-5 sm:px-7"><h2 className="text-lg font-semibold">บันทึกงานรายวัน</h2><p className="mt-2 text-xs leading-6 text-slate-500">กรอกงานที่ได้รับมอบหมายและผลการฝึกงานของแต่ละวัน หากเป็นวันหยุดให้ระบุในช่องงาน</p></div>
         <div className="border-b border-slate-100 p-5 sm:px-7"><button type="button" className="btn-secondary" disabled={!data.startDate||suggestionBusy} onClick={()=>void loadSuggestions()}>{suggestionBusy?'กำลังดึงงาน…':'นำงานจากปฏิทินมาช่วยกรอก'}</button><p className="mt-2 text-xs text-slate-500">ใช้วันครบกำหนดของงานในช่วง 5 วันที่เลือก และเฉพาะโปรเจกต์ที่เลือกไว้ ถ้ายังไม่ได้เลือกโปรเจกต์จะดูทุกงาน</p>{suggestions&&<div className="mt-3 rounded-xl border border-teal-100 bg-teal-50 p-4 text-sm"><p className="font-semibold">ตรวจงานที่จะนำเข้า</p>{suggestions.map(day=><p key={day.date} className="mt-2">{day.date}: {day.tasks.length?day.tasks.map(task=>task.title).join(', '):'ไม่มีงาน'}</p>)}<div className="mt-3 flex flex-wrap gap-2"><button type="button" className="btn-secondary" onClick={()=>applySuggestions(false)}>เติมเฉพาะช่องว่าง</button><button type="button" className="btn-secondary" onClick={()=>applySuggestions(true)}>แทนที่ช่องงานทั้ง 5 วัน</button><button type="button" className="btn-secondary" onClick={()=>setSuggestions(null)}>ยกเลิก</button></div></div>}</div>
-        {data.days.map((day,index)=><div key={index} className="border-b border-slate-100 p-5 last:border-b-0 sm:p-7"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">วันที่ {index+1}{dates[index]?` · ${thaiLongDate(dates[index])}`:''}</h3><span className="text-xs text-teal-700">{data.startTime||'--:--'}–{data.endTime||'--:--'}</span></div><div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
+        {[1, 2, 3, 4, 5].map(dayNumber => { const index = dayNumber - 1; const day = data.days[index]; return <div key={dayNumber} className="border-b border-slate-100 p-5 last:border-b-0 sm:p-7"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">วันที่ {index+1}{dates[index]?` · ${thaiLongDate(dates[index])}`:''}</h3><span className="text-xs text-teal-700">{data.startTime||'--:--'}–{data.endTime||'--:--'}</span></div><div className="grid gap-5 lg:grid-cols-[3fr_2fr]">
           <label className="field-label">งานที่ได้รับมอบหมาย วันที่ {index+1}<textarea className="field mt-2 min-h-32 resize-y" value={day.assignment} onChange={event=>update({days:data.days.map((item,i)=>i===index?{...item,assignment:event.target.value}:item)})} maxLength={600} placeholder="ระบุงานหรือกิจกรรมที่ทำในวันนี้"/><span className="mt-1 block text-right text-xs font-normal text-slate-400">{day.assignment.length}/600</span></label>
           <label className="field-label">ผลการฝึกงาน วันที่ {index+1}<textarea className="field mt-2 min-h-32 resize-y" value={day.result} onChange={event=>update({days:data.days.map((item,i)=>i===index?{...item,result:event.target.value}:item)})} maxLength={400} placeholder="ผลลัพธ์หรือสิ่งที่ได้เรียนรู้"/><span className="mt-1 block text-right text-xs font-normal text-slate-400">{day.result.length}/400</span></label>
-        </div></div>)}
+        </div></div>; })}
       </fieldset>
       <div className="panel p-5 sm:p-7"><p className="text-sm leading-7 text-slate-600">ช่องลงชื่อผู้ควบคุมการฝึกงาน ตำแหน่ง และวัน/เดือน/ปี จะเว้นว่างพร้อมเส้นประตามต้นฉบับสำหรับลงนามภายหลัง</p><p className="mt-2 text-xs leading-6 text-slate-500">PDF ใช้กระดาษ A4 และฝังฟอนต์ภาษาไทย หากกรอกข้อความยาวเอกสารอาจมีมากกว่า 1 หน้า ระบบเก็บร่างล่าสุด ส่วนไฟล์ PDF ให้ดาวน์โหลดเก็บไว้</p>
         {error&&<p role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}{message&&<p role="status" className="mt-4 text-sm text-teal-700">{message}</p>}

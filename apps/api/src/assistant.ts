@@ -40,6 +40,57 @@ async function readGeminiResponse(response: Response, model: string): Promise<un
   try{return JSON.parse(raw);}catch{throw new ApiError(503,'AI_FORMAT','AI ตอบกลับไม่เป็นรูปแบบที่รองรับ');}
 }
 
+async function answerTaskQuery(db: Database, userId: string, action: AssistantAction | null) {
+  if(action?.type==='summary'){
+    const row=(await get<{total:number;completed:number;overdue:number}>(db,"SELECT COUNT(*) total,COALESCE(SUM(status='completed'),0) completed,COALESCE(SUM(status!='completed' AND due_date<?),0) overdue FROM tasks WHERE user_id=?",bangkokDate(),userId))!;
+    return {reply:`มีงานทั้งหมด ${row.total} งาน เสร็จแล้ว ${row.completed} งาน และเลยกำหนด ${row.overdue} งาน`,action:null};
+  }
+  if(action?.type==='list_tasks'){
+    const rows=await all<{title:string;due_date:string|null;status:string}>(db,"SELECT title,due_date,status FROM tasks WHERE user_id=? AND (?='' OR instr(lower(title),lower(?))>0) ORDER BY due_date LIMIT 20",userId,action.search??'',action.search??'');
+    const reply = rows.map(task => {
+      const dueDate = task.due_date ? ' (' + task.due_date + ')' : '';
+      return `${task.title}${dueDate} · ${task.status}`;
+    }).join('\n');
+    return {reply: reply || 'ไม่พบงานที่ตรงกับคำค้นหา', action: null};
+  }
+}
+
+async function resolveActionFields(db: Database, userId: string, action: AssistantAction | null) {
+  const resolvedFields:Record<string,string>={};
+  if (!action) return { resolvedFields };
+  if ('target' in action) {
+    const [table, column] = assistantTarget(action.type);
+    const matches=await all<{id:string}>(db,`SELECT id FROM ${table} WHERE user_id=? AND lower(${column})=lower(?) LIMIT 2`,userId,action.target);
+    if(matches.length!==1)return {reply:matches.length?'มีชื่อซ้ำกัน กรุณาแก้ในหน้ารายการ':'ไม่พบรายการชื่อนี้ กรุณาตรวจชื่อให้ตรง',action:null};
+    resolvedFields.id=matches[0].id;
+  }
+  if('project_name'in action&&action.project_name){
+    const matches=await all<{id:string}>(db,'SELECT id FROM projects WHERE user_id=? AND lower(name)=lower(?) LIMIT 2',userId,action.project_name);
+    if(matches.length!==1)return {reply:'ไม่พบโปรเจกต์ชื่อนี้ หรือมีชื่อซ้ำ กรุณาระบุให้ชัดเจน',action:null};
+    resolvedFields.project_id=matches[0].id;
+  }
+  return { resolvedFields };
+}
+
+function assistantTarget(type: AssistantAction['type']) {
+  return type.endsWith('task') || type === 'link_github_issue' ? ['tasks', 'title'] : ['projects', 'name'];
+}
+
+function includesPipelineDetails(action: Extract<AssistantAction, {type: 'github_pipeline'}>, message: string) {
+  if (!message.includes(action.repository) || !message.includes(String(action.id))) return false;
+  return action.kind !== 'dispatch' || Boolean(action.ref && message.includes(action.ref));
+}
+
+function parseAssistantProposal(parsed: unknown) {
+  const envelope = z.object({reply:z.string().trim().min(1).max(500),action:z.unknown().nullable()}).safeParse(parsed);
+  if (!envelope.success) throw new ApiError(503,'AI_FORMAT','AI ตอบกลับไม่ครบ');
+  const { reply, action } = envelope.data;
+  if (action === null) return { reply, action };
+  const proposed = assistantAction.safeParse(action);
+  if (!proposed.success) throw new ApiError(503,'AI_FORMAT','AI เสนอคำสั่งที่ไม่รองรับ กรุณาอธิบายใหม่');
+  return { reply, action: proposed.data };
+}
+
 export function assistantRoutes(db:Database,options:{key?:string;model?:string;fetch?:typeof fetch}={}) {
   const routes=new Hono<Env>();
   routes.get('/status',c=>c.json({available:!!options.key}));
@@ -65,36 +116,16 @@ export function assistantRoutes(db:Database,options:{key?:string;model?:string;f
     let response:Response;
     try {response=await(options.fetch??fetch)(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':options.key},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.1,maxOutputTokens:700}}),signal:AbortSignal.timeout(20_000)});}catch{throw new ApiError(503,'AI_UNAVAILABLE','ติดต่อ Gemini ไม่สำเร็จ กรุณาลองใหม่');}
     const parsed = await readGeminiResponse(response, model);
-    const envelope=z.object({reply:z.string().trim().min(1).max(500),action:z.unknown().nullable()}).safeParse(parsed);
-    if(!envelope.success)throw new ApiError(503,'AI_FORMAT','AI ตอบกลับไม่ครบ');
-    const proposed=envelope.data.action===null?null:assistantAction.safeParse(envelope.data.action);
-    if(proposed&&!proposed.success)throw new ApiError(503,'AI_FORMAT','AI เสนอคำสั่งที่ไม่รองรับ กรุณาอธิบายใหม่');
-    const action=proposed&&proposed.success?proposed.data:null;
-    if(action?.type==='github_pipeline'&&(!message.includes(action.repository)||!message.includes(String(action.id))||(action.kind==='dispatch'&&(!action.ref||!message.includes(action.ref)))))return c.json({reply:'ระบุ repository, หมายเลข workflow หรือ run และ branch ให้ครบก่อนสั่ง GitHub',action:null});
+    const { reply, action } = parseAssistantProposal(parsed);
+    if(action?.type==='github_pipeline'&&!includesPipelineDetails(action,message))return c.json({reply:'ระบุ repository, หมายเลข workflow หรือ run และ branch ให้ครบก่อนสั่ง GitHub',action:null});
     if(action?.type==='link_github_issue'&&!message.includes(action.url))return c.json({reply:'กรุณาใส่ลิงก์ GitHub Issue หรือ Pull Request ที่ต้องการผูกกับงาน',action:null});
-    const userId=c.get('user').id;
-    if(action?.type==='summary'){
-      const row=(await get<{total:number;completed:number;overdue:number}>(db,"SELECT COUNT(*) total,COALESCE(SUM(status='completed'),0) completed,COALESCE(SUM(status!='completed' AND due_date<?),0) overdue FROM tasks WHERE user_id=?",bangkokDate(),userId))!;
-      return c.json({reply:`มีงานทั้งหมด ${row.total} งาน เสร็จแล้ว ${row.completed} งาน และเลยกำหนด ${row.overdue} งาน`,action:null});
-    }
-    if(action?.type==='list_tasks'){
-      const rows=await all<{title:string;due_date:string|null;status:string}>(db,"SELECT title,due_date,status FROM tasks WHERE user_id=? AND (?='' OR instr(lower(title),lower(?))>0) ORDER BY due_date LIMIT 20",userId,action.search??'',action.search??'');
-      return c.json({reply:rows.length?rows.map(t=>`${t.title}${t.due_date?` (${t.due_date})`:''} · ${t.status}`).join('\n'):'ไม่พบงานที่ตรงกับคำค้นหา',action:null});
-    }
-    const resolvedFields:Record<string,string>={};
-    if(action&&'target'in action){
-      const table=action.type.endsWith('task')||action.type==='link_github_issue'?'tasks':'projects';
-      const column=table==='tasks'?'title':'name';
-      const matches=await all<{id:string}>(db,`SELECT id FROM ${table} WHERE user_id=? AND lower(${column})=lower(?) LIMIT 2`,userId,action.target);
-      if(matches.length!==1)return c.json({reply:matches.length?'มีชื่อซ้ำกัน กรุณาแก้ในหน้ารายการ':'ไม่พบรายการชื่อนี้ กรุณาตรวจชื่อให้ตรง',action:null});
-      resolvedFields.id=matches[0].id;
-    }
-    if(action&&'project_name'in action&&action.project_name){
-      const matches=await all<{id:string}>(db,'SELECT id FROM projects WHERE user_id=? AND lower(name)=lower(?) LIMIT 2',userId,action.project_name);
-      if(matches.length!==1)return c.json({reply:'ไม่พบโปรเจกต์ชื่อนี้ หรือมีชื่อซ้ำ กรุณาระบุให้ชัดเจน',action:null});
-      resolvedFields.project_id=matches[0].id;
-    }
-    return c.json({reply:envelope.data.reply,action:action?{...action,...resolvedFields}:null});
+    const userId = c.get('user').id;
+    const answer = await answerTaskQuery(db, userId, action);
+    if (answer) return c.json(answer);
+    const resolution = await resolveActionFields(db, userId, action);
+    if ('reply' in resolution) return c.json(resolution);
+    const { resolvedFields } = resolution;
+    return c.json({reply,action:action?{...action,...resolvedFields}:null});
   });
   return routes;
 }

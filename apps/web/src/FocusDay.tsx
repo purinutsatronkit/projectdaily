@@ -1,4 +1,4 @@
-import {useEffect,useState,type FormEvent} from 'react';
+import {useEffect,useState,type SubmitEvent} from 'react';
 import {Clock3,Plus,Trash2} from 'lucide-react';
 import type {Task} from '@taskflow/shared';
 
@@ -10,7 +10,7 @@ export default function FocusDay({tasks,onSelect}:{tasks:Task[];onSelect:(task:T
   useEffect(()=>{void request(`?date=${date}`).then(v=>setSlots(v.slots)).catch(e=>setError(e.message));},[date,revision]);
   const pending=tasks.filter(v=>v.status!=='completed');
   const urgent=pending.filter(v=>v.due_date&&v.due_date<=date).slice(0,8);
-  async function save(event:FormEvent){event.preventDefault();setError('');try{await request('',{method:'POST',body:JSON.stringify({task_id:taskId,plan_date:date,start_time:start,end_time:end})});setTaskId('');setRevision(v=>v+1);}catch(e){setError((e as Error).message);}}
+  async function save(event:SubmitEvent){event.preventDefault();setError('');try{await request('',{method:'POST',body:JSON.stringify({task_id:taskId,plan_date:date,start_time:start,end_time:end})});setTaskId('');setRevision(v=>v+1);}catch(e){setError((e as Error).message);}}
   async function remove(id:string){try{await request(`/${id}`,{method:'DELETE'});setRevision(v=>v+1);}catch(e){setError((e as Error).message);}}
   return <div className="space-y-6"><div className="page-intro"><p className="eyebrow">Focus today</p><h1 className="page-title">วันนี้ควรทำอะไร<span className="text-[#a66a5f]">.</span></h1><p className="page-description">ดูงานที่ต้องส่งก่อน แล้วเลือกเวลาให้แต่ละงานในวันนี้</p></div>
     <section className="panel p-5"><label className="field-label">วางแผนวันที่<input type="date" className="field mt-2" value={date} onChange={e=>setDate(e.target.value)}/></label><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-red-50 p-4"><strong>{urgent.length} งาน</strong><p className="mt-1 text-sm text-slate-600">ครบกำหนดแล้วหรือภายในวันที่เลือก</p></div><div className="rounded-xl bg-teal-50 p-4"><strong>{slots.length} ช่วงเวลา</strong><p className="mt-1 text-sm text-slate-600">วางแผนไว้สำหรับวันนี้</p></div></div></section>

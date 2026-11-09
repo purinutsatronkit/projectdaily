@@ -1,4 +1,4 @@
-import {useEffect,useState,type FormEvent} from 'react';
+import {useEffect,useState,type SubmitEvent} from 'react';
 import {Users,Plus} from 'lucide-react';
 import type {Project} from '@taskflow/shared';
 import TaskHistory from './TaskHistory';
@@ -14,8 +14,8 @@ export default function SharedProjects({owned,userId,preferredProject}:{owned:Pr
   useEffect(()=>{if(preferredProject)setSelected(preferredProject);},[preferredProject]);
   useEffect(()=>{void request('').then(v=>setShared(v.projects)).catch(e=>setError(e.message));},[revision]);
   useEffect(()=>{if(!selected){setDetail(null);return;}void request(`/${selected}`).then(setDetail).catch(e=>setError(e.message));},[selected,revision]);
-  async function addMember(event:FormEvent){event.preventDefault();setError('');try{await request(`/${selected}/members`,{method:'POST',body:JSON.stringify({email,role})});setEmail('');setRevision(v=>v+1);}catch(e){setError((e as Error).message);}}
-  async function addTask(event:FormEvent){event.preventDefault();setError('');try{await request(`/${selected}/tasks`,{method:'POST',body:JSON.stringify({title})});setTitle('');setRevision(v=>v+1);}catch(e){setError((e as Error).message);}}
+  async function addMember(event:SubmitEvent){event.preventDefault();setError('');try{await request(`/${selected}/members`,{method:'POST',body:JSON.stringify({email,role})});setEmail('');setRevision(v=>v+1);}catch(e){setError((e as Error).message);}}
+  async function addTask(event:SubmitEvent){event.preventDefault();setError('');try{await request(`/${selected}/tasks`,{method:'POST',body:JSON.stringify({title})});setTitle('');setRevision(v=>v+1);}catch(e){setError((e as Error).message);}}
   async function updateTask(id:string,body:object){setError('');try{await request(`/${selected}/tasks/${id}`,{method:'PATCH',body:JSON.stringify(body)});setRevision(v=>v+1);}catch(e){setError((e as Error).message);}}
   async function removeMember(id:string){if(!window.confirm('นำสมาชิกออกจากโปรเจกต์?')) { return; }try{await request(`/${selected}/members/${id}`,{method:'DELETE'});if(id===userId) { setSelected(''); }setRevision(v=>v+1);}catch(e){setError((e as Error).message);}}
   const owner=detail?.project.user_id===undefined?false:owned.some(p=>p.id===detail.project.id),editable=detail?.role==='owner'||detail?.role==='editor';

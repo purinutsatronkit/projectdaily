@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {createApp} from '../apps/api/src/app.ts';
 import {openDatabase} from '../apps/api/src/db.ts';
 import {seal,unseal,socialFromEnvironment} from '../apps/api/src/social-config.ts';
-import {digest} from '../apps/api/src/social.ts';
 const origin='http://localhost:5173',secret='social-test-secret-longer-than-32-characters',key='12'.repeat(32);
 function fixture(t:import('node:test').TestContext){
   const db=openDatabase(':memory:');t.after(()=>db.close());const calls:{url:string;method:string;body:any;authorization:string|null}[]=[];

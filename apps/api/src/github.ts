@@ -12,6 +12,52 @@ const numberId=z.string().regex(/^[1-9]\d{0,18}$/);
 const hasAsciiControl = (value: string) => Array.from(value).some(character => character.charCodeAt(0) < 32);
 const refSchema=z.string().min(1).max(255).refine(v=>!hasAsciiControl(v));
 const inputsSchema=z.record(z.string().min(1).max(100),z.union([z.string().max(2000),z.boolean(),z.number()])).refine(v=>Object.keys(v).length<=25);
+function githubResponseError(response: Response, missing: () => ApiError) {
+  if(response.status===401) return missing();
+  if(response.status===403||response.status===429) return new ApiError(response.status===429||response.headers.get('x-ratelimit-remaining')==='0'?429:403,'GITHUB_PERMISSION','GitHub จำกัดคำขอหรือสิทธิ์ไม่เพียงพอ ตรวจสิทธิ์ App/บัญชี แล้วลองใหม่ภายหลัง');
+  if(response.status===404) return new ApiError(404,'GITHUB_NOT_FOUND','ไม่พบข้อมูล หรือ GitHub App ยังไม่ได้รับสิทธิ์ repository นี้');
+  if(response.status===422||response.status===409) return new ApiError(400,'GITHUB_REJECTED','GitHub ไม่รับคำสั่งนี้ ตรวจ branch, workflow_dispatch, inputs และสถานะการรัน');
+  return new ApiError(503,'GITHUB_UNAVAILABLE','GitHub ไม่พร้อมใช้งาน กรุณาลองใหม่');
+}
+
+async function readGitHubBody(response: Response) {
+  if(response.status===204) return null;
+  const reader=response.body?.getReader();if(!reader) return null;
+  const chunks:Uint8Array[]=[];let size=0;
+  for(;;){const {done,value}=await reader.read();if(done) { break; }size+=value.length;if(size>8*1024*1024){await reader.cancel();throw new ApiError(400,'GITHUB_TOO_LARGE','ข้อมูลชุดนี้มีขนาดใหญ่ กรุณาเปิดดูบน GitHub');}chunks.push(value);}
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+type MonitoredProject = { id: string; github_repo: string; follow_workflow_id: string | null; create_failure_tasks: number };
+
+async function recordPipelineFailure(db: Database, userId: string, project: MonitoredProject, runId: string, title: string) {
+  const stamp = now();
+  const inserted=await db.prepare('INSERT OR IGNORE INTO pipeline_notifications VALUES(?,?,?,?,?,?,?,NULL)').run(randomUUID(),userId,project.id,project.github_repo,runId,title,stamp);
+  if(inserted.changes&&project.create_failure_tasks){
+    const taskTitle=`ตรวจ pipeline ล้มเหลว: ${title}`.slice(0,120);
+    const description=`GitHub Actions ${project.github_repo} · Run #${runId}\nhttps://github.com/${project.github_repo}/actions/runs/${runId}`;
+    const taskId=randomUUID();
+    await db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,project_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(taskId,userId,taskTitle,description,'high','pending',null,project.id,stamp,stamp);
+    await recordTaskActivity(db,{id:taskId,user_id:userId,title:taskTitle,description,priority:'high',status:'pending',due_date:null,project_id:project.id,assigned_to:null},null,'created');
+  }
+}
+
+type PipelineRun = { id: number; status: string; conclusion: string; workflow_id: number; display_title?: string; name?: string };
+
+async function observePipelineRun(db: Database, userId: string, project: MonitoredProject, run: PipelineRun, hadBaseline: boolean) {
+  if(!Number.isSafeInteger(run.id)||run.id<=0||typeof run.status!=='string')return;
+  if(project.follow_workflow_id&&String(run.workflow_id)!==project.follow_workflow_id)return;
+  const state=`${run.status}:${run.conclusion??''}`,runId=String(run.id);
+  const previous=await get<{state:string}>(db,'SELECT state FROM pipeline_observations WHERE user_id=? AND repository=? AND run_id=?',userId,project.github_repo,runId);
+  await db.prepare('INSERT INTO pipeline_observations(user_id,repository,run_id,state) VALUES(?,?,?,?) ON CONFLICT(user_id,repository,run_id) DO UPDATE SET state=excluded.state').run(userId,project.github_repo,runId,state);
+  const changed = previous ? previous.state !== state : hadBaseline;
+  if (changed && run.status === 'completed' && ['failure', 'timed_out', 'action_required'].includes(run.conclusion)) {
+    const title = String(run.display_title || run.name || 'Pipeline').slice(0, 120);
+    await recordPipelineFailure(db, userId, project, runId, title);
+  }
+
+}
+
 export function githubRoutes(db:Database,config:Config) {
   const routes=new Hono<Env>(),refreshing=new Map<string,Promise<string>>();
   type Connection={token_cipher:string};
@@ -40,48 +86,24 @@ export function githubRoutes(db:Database,config:Config) {
   async function api(userId:string,path:string,method='GET',body?:unknown):Promise<any> {
     const token=await access(userId);
     const response=await (config.social!.fetch??fetch)(`https://api.github.com${path}`,{method,headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(20000),redirect:'error'});
-    if(!response.ok) {
-      if(response.status===401) throw missing();
-      if(response.status===403||response.status===429) throw new ApiError(response.status===429||response.headers.get('x-ratelimit-remaining')==='0'?429:403,'GITHUB_PERMISSION','GitHub จำกัดคำขอหรือสิทธิ์ไม่เพียงพอ ตรวจสิทธิ์ App/บัญชี แล้วลองใหม่ภายหลัง');
-      if(response.status===404) throw new ApiError(404,'GITHUB_NOT_FOUND','ไม่พบข้อมูล หรือ GitHub App ยังไม่ได้รับสิทธิ์ repository นี้');
-      if(response.status===422||response.status===409) throw new ApiError(400,'GITHUB_REJECTED','GitHub ไม่รับคำสั่งนี้ ตรวจ branch, workflow_dispatch, inputs และสถานะการรัน');
-      throw new ApiError(503,'GITHUB_UNAVAILABLE','GitHub ไม่พร้อมใช้งาน กรุณาลองใหม่');
-    }
-    if(response.status===204) return null;
-    const reader=response.body?.getReader();if(!reader) return null;
-    const chunks:Uint8Array[]=[];let size=0;
-    for(;;){const {done,value}=await reader.read();if(done) { break; }size+=value.length;if(size>8*1024*1024){await reader.cancel();throw new ApiError(400,'GITHUB_TOO_LARGE','ข้อมูลชุดนี้มีขนาดใหญ่ กรุณาเปิดดูบน GitHub');}chunks.push(value);}
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    if (!response.ok) throw githubResponseError(response, missing);
+    return readGitHubBody(response);
+
   }
   const parse=<T>(schema:z.ZodType<T>,value:unknown)=>{const result=schema.safeParse(value);if(!result.success) { throw new ApiError(400,'INVALID_GITHUB_PARAMETER','พารามิเตอร์ GitHub ไม่ถูกต้อง'); }return result.data;};
   const page=(value:string|undefined)=>parse(z.coerce.number().int().min(1).max(1000),value??'1');
   routes.get('/actions',async c=>c.json({actions:await all(db,'SELECT id,repository,action,target,created_at FROM pipeline_actions WHERE user_id=? ORDER BY created_at DESC LIMIT 50',c.get('user').id)}));
   routes.get('/alerts',async c=>{
     const userId=c.get('user').id;
-    const projects=await all<{id:string;github_repo:string;follow_workflow_id:string|null;create_failure_tasks:number}>(db,'SELECT id,github_repo,follow_workflow_id,create_failure_tasks FROM projects WHERE user_id=? AND (notify_pipeline=1 OR create_failure_tasks=1) AND github_repo IS NOT NULL ORDER BY created_at LIMIT 10',userId);
+    const projects=await all<MonitoredProject>(db,'SELECT id,github_repo,follow_workflow_id,create_failure_tasks FROM projects WHERE user_id=? AND (notify_pipeline=1 OR create_failure_tasks=1) AND github_repo IS NOT NULL ORDER BY created_at LIMIT 10',userId);
     const connected=Boolean(await read(userId));let failures=0;
     if(connected)for(const project of projects){
       const parts=project.github_repo.split('/');if(parts.length!==2||!parts.every(p=>segment.safeParse(p).success))continue;
       try{
         const response=await api(userId,`${base(parts[0],parts[1])}/actions/runs?per_page=20&page=1`);
         const hadBaseline=Boolean(await get(db,'SELECT 1 FROM pipeline_observations WHERE user_id=? AND repository=? LIMIT 1',userId,project.github_repo));
-        for(const run of response.workflow_runs??[]){
-          if(!Number.isSafeInteger(run.id)||run.id<=0||typeof run.status!=='string')continue;
-          if(project.follow_workflow_id&&String(run.workflow_id)!==project.follow_workflow_id)continue;
-          const state=`${run.status}:${run.conclusion??''}`,runId=String(run.id);
-          const previous=await get<{state:string}>(db,'SELECT state FROM pipeline_observations WHERE user_id=? AND repository=? AND run_id=?',userId,project.github_repo,runId);
-          await db.prepare('INSERT INTO pipeline_observations(user_id,repository,run_id,state) VALUES(?,?,?,?) ON CONFLICT(user_id,repository,run_id) DO UPDATE SET state=excluded.state').run(userId,project.github_repo,runId,state);
-          if((previous?previous.state!==state:hadBaseline)&&run.status==='completed'&&['failure','timed_out','action_required'].includes(run.conclusion)){
-            const stamp=now(),title=String(run.display_title||run.name||'Pipeline').slice(0,120);
-            const inserted=await db.prepare('INSERT OR IGNORE INTO pipeline_notifications VALUES(?,?,?,?,?,?,?,NULL)').run(randomUUID(),userId,project.id,project.github_repo,runId,title,stamp);
-            if(inserted.changes&&project.create_failure_tasks){
-              const taskTitle=`ตรวจ pipeline ล้มเหลว: ${title}`.slice(0,120);
-              const description=`GitHub Actions ${project.github_repo} · Run #${runId}\nhttps://github.com/${project.github_repo}/actions/runs/${runId}`;
-              const taskId=randomUUID();
-              await db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,project_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(taskId,userId,taskTitle,description,'high','pending',null,project.id,stamp,stamp);
-              await recordTaskActivity(db,{id:taskId,user_id:userId,title:taskTitle,description,priority:'high',status:'pending',due_date:null,project_id:project.id,assigned_to:null},null,'created');
-            }
-          }
+        for (const run of response.workflow_runs ?? []) {
+          await observePipelineRun(db, userId, project, run, hadBaseline);
         }
       }catch{failures++;}
     }
@@ -117,7 +139,7 @@ export function githubRoutes(db:Database,config:Config) {
     const latest=new Map<string,string>();for(const review of reviewList){if(typeof review.user?.login==='string'&&typeof review.state==='string')latest.set(review.user.login,review.state);}
     return c.json({title:item.title,number:item.number,state:item.state,merged:!!item.merged,draft:!!item.draft,html_url:item.html_url,head_sha:item.head?.sha??null,additions:item.additions??0,deletions:item.deletions??0,changed_files:item.changed_files??0,
       reviews:[...latest].map(([login,state])=>({login,state})),files:files.status==='fulfilled'&&Array.isArray(files.value)?files.value.map((file:any)=>({filename:file.filename,status:file.status,additions:file.additions,deletions:file.deletions})):[],
-      checks:checks.status==='fulfilled'&&Array.isArray(checks.value?.check_runs)?checks.value.check_runs.map((check:any)=>({name:check.name,status:check.status,conclusion:check.conclusion,html_url:check.html_url})):[],
+      checks:checks.status==='fulfilled'&&Array.isArray(checks.value?.check_runs)?checks.value.check_runs.map((check:any)=>({id:check.id,name:check.name,status:check.status,conclusion:check.conclusion,html_url:check.html_url})):[],
       limited:{reviews:reviews.status==='rejected',files:files.status==='rejected',checks:checks.status==='rejected'}});
   });
   routes.get('/repos/:owner/:repo/files',async c=>{

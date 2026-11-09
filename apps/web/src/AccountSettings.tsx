@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type SubmitEvent } from 'react';
 import { accountSchema, type User } from '@taskflow/shared';
 import { Camera, Check, LoaderCircle, Upload } from 'lucide-react';
 import SocialAccounts from './SocialAccounts';
@@ -29,7 +29,7 @@ export default function AccountSettings({ user, onSaved, onDeleted }: { user: Us
   const [busy,setBusy] = useState(false), [error,setError] = useState(''), [message,setMessage] = useState('');
   const changingEmail = email.trim().toLowerCase() !== user.email;
   function begin() { setBusy(true); setError(''); setMessage(''); }
-  async function save(event: FormEvent) {
+  async function save(event: SubmitEvent) {
     event.preventDefault(); setError(''); setMessage('');
     const parsed = accountSchema.safeParse({ name,nickname,phone,email,current_password: changingEmail ? password : undefined });
     if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
@@ -53,7 +53,7 @@ export default function AccountSettings({ user, onSaved, onDeleted }: { user: Us
     if (!file) return;
     begin(); try { await upload(file); } catch (err) { setError(err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ'); } finally { setBusy(false); }
   }
-  async function fromLink(event: FormEvent) {
+  async function fromLink(event: SubmitEvent) {
     event.preventDefault(); begin();
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     try {
@@ -71,7 +71,7 @@ export default function AccountSettings({ user, onSaved, onDeleted }: { user: Us
         parts.push(new Uint8Array(chunk.value).buffer);
       }
       await upload(new Blob(parts,{type}));
-    } catch (err) { setError(err instanceof TypeError ? 'เว็บไซต์ต้นทางไม่อนุญาตให้โหลดรูปจากลิงก์นี้ ให้ดาวน์โหลดรูปแล้วเลือกไฟล์จากเครื่องแทน' : err instanceof Error ? err.message : 'โหลดรูปไม่สำเร็จ'); }
+    } catch (err) { setError(avatarLinkError(err)); }
     finally { await reader?.cancel().catch(() => {}); setBusy(false); }
   }
   async function removeImage() {
@@ -98,4 +98,9 @@ export default function AccountSettings({ user, onSaved, onDeleted }: { user: Us
     <SocialAccounts/>
     <AccountData user={user} onDeleted={onDeleted}/>
   </div>;
+}
+
+function avatarLinkError(error: unknown) {
+  if (error instanceof TypeError) return 'เว็บไซต์ต้นทางไม่อนุญาตให้โหลดรูปจากลิงก์นี้ ให้ดาวน์โหลดรูปแล้วเลือกไฟล์จากเครื่องแทน';
+  return error instanceof Error ? error.message : 'โหลดรูปไม่สำเร็จ';
 }
