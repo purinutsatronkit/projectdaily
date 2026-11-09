@@ -40,7 +40,7 @@ export default function AccountSettings({ user, onSaved, onDeleted }: { user: Us
       const updated:User=result.user;onSaved(updated); setName(updated.name); setNickname(updated.nickname || ''); setPhone(updated.phone || ''); setEmail(updated.email); setPassword(''); setMessage(result.message??'บันทึกข้อมูลบัญชีแล้ว');
     } catch (err) { setError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ'); } finally { setBusy(false); }
   }
-  async function requestVerification(){begin();try{const response=await fetch('/api/auth/request-email-verification',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'});const result=await response.json();if(!response.ok)throw new Error(result.error?.message??'ส่งลิงก์ไม่สำเร็จ');setMessage(result.message);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+  async function requestVerification(){begin();try{const response=await fetch('/api/auth/request-email-verification',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'});const result=await response.json();if(!response.ok) { throw new Error(result.error?.message??'ส่งลิงก์ไม่สำเร็จ'); }setMessage(result.message);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   async function upload(blob: Blob) {
     if (!blob.size || blob.size > MAX_IMAGE) throw new Error('รูปภาพต้องมีขนาดไม่เกิน 2 MB');
     if (!IMAGE_TYPES.includes(blob.type)) throw new Error('ใช้รูป JPG, PNG, GIF หรือ WebP เท่านั้น');

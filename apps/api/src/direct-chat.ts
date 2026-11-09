@@ -35,7 +35,7 @@ async function checkAttachmentQuota(db: Database, userId: string, size: number) 
 
 export function directChatRoutes(db:Database){
   const routes=new Hono<Env>();
-  async function access(id:string,userId:string){const room=await get<Conversation>(db,'SELECT id,user_low,user_high FROM direct_conversations WHERE id=? AND (user_low=? OR user_high=?)',id,userId,userId);if(!room)throw new ApiError(404,'NOT_FOUND','ไม่พบห้องแชทนี้');return room;}
+  async function access(id:string,userId:string){const room=await get<Conversation>(db,'SELECT id,user_low,user_high FROM direct_conversations WHERE id=? AND (user_low=? OR user_high=?)',id,userId,userId);if(!room) { throw new ApiError(404,'NOT_FOUND','ไม่พบห้องแชทนี้'); }return room;}
   routes.get('/',async c=>{
     const id=c.get('user').id;
     const conversations=await all(db,`SELECT d.id,d.updated_at,u.id peer_id,u.name peer_name,u.nickname peer_nickname,u.email peer_email,

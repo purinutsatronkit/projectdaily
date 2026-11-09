@@ -1,6 +1,6 @@
 import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync,existsSync} from 'node:fs';
-import {resolve,dirname} from 'node:path';
+import {resolve} from 'node:path';
 const source=resolve(process.env.DATABASE_PATH??'./data/taskflow.sqlite');
 if(!existsSync(source))throw new Error('Database not found');
 const folder=resolve('backups');mkdirSync(folder,{recursive:true});

@@ -16,7 +16,7 @@ export async function queueVerification(db:Database,config:Config,userId:string,
   await db.prepare('UPDATE email_verifications SET used_at=? WHERE user_id=? AND email=? AND used_at IS NULL').run(timestamp,userId,email);
   await db.prepare('INSERT INTO email_verifications VALUES(?,?,?,?,?,NULL,?)').run(id,userId,email,digest(token),new Date(Date.now()+15*60000).toISOString(),timestamp);
   const link=new URL('/verify-email',trustedPublicUrl(mail.publicUrl,!!config.production));link.hash=new URLSearchParams({token}).toString();
-  setImmediate(()=>{void mail.sendVerification!({to:email,verifyUrl:link.toString()}).catch(async ()=>{await db.prepare('DELETE FROM email_verifications WHERE id=? AND used_at IS NULL').run(id);if(!config.silent)console.error(JSON.stringify({level:'error',event:'verification_email_failed'}));});});
+  setImmediate(()=>{mail.sendVerification!({to:email,verifyUrl:link.toString()}).catch(async ()=>{await db.prepare('DELETE FROM email_verifications WHERE id=? AND used_at IS NULL').run(id);if(!config.silent)console.error(JSON.stringify({level:'error',event:'verification_email_failed'}));});});
 }
 export function verificationRoutes(db:Database,config:Config){
   const routes=new Hono<Env>(),session=sessionMiddleware(db,config);
@@ -36,7 +36,7 @@ export function verificationRoutes(db:Database,config:Config){
       await db.prepare('UPDATE users SET email=?,email_verified_at=? WHERE id=?').run(record.email,now(),record.user_id);
       await db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(record.user_id);
       await db.prepare('DELETE FROM email_verifications WHERE user_id=? AND id!=?').run(record.user_id,record.id);
-    });}catch(error){if(String(error).includes('UNIQUE constraint'))throw new ApiError(409,'EMAIL_EXISTS','อีเมลนี้มีบัญชีอยู่แล้ว');throw error;}
+    });}catch(error){if(String(error).includes('UNIQUE constraint')) { throw new ApiError(409,'EMAIL_EXISTS','อีเมลนี้มีบัญชีอยู่แล้ว'); }throw error;}
     return c.json({message:'ยืนยันอีเมลสำเร็จแล้ว'});
   });
   return routes;

@@ -27,7 +27,7 @@ export function useSk09Draft(user:User) {
       setReady(true);
     } catch(err) {if(!signal?.aborted) setError(err instanceof Error?err.message:'โหลดร่างไม่สำเร็จ');}
   },[]);
-  useEffect(()=>{const controller=new AbortController();void load(controller.signal);return ()=>controller.abort();},[load]);
+  useEffect(()=>{const controller=new AbortController();load(controller.signal);return ()=>controller.abort();},[load]);
 
   const save=useCallback(async()=>{
     if(pending.current) return pending.current;
@@ -50,7 +50,7 @@ export function useSk09Draft(user:User) {
   },[ready]);
   useEffect(()=>{
     if(!ready || !dirty || error) return;
-    const timer=setTimeout(()=>{void save().catch(()=>{});},800);
+    const timer=setTimeout(()=>{save().catch(()=>{});},800);
     return ()=>clearTimeout(timer);
   },[data,ready,dirty,error,save]);
   useEffect(()=>{

@@ -17,11 +17,11 @@ function addFourDays(date:string){const value=new Date(`${date}T00:00:00Z`);valu
 export default function AssistantChat({user,draft,onNavigate,onChanged,onUserUpdated}:{user:User;draft:Sk09DraftController;onNavigate:(view:View)=>void;onChanged:()=>void;onUserUpdated:(user:User)=>void}){
   const [open,setOpen]=useState(false),[available,setAvailable]=useState<boolean|null>(null),[consent,setConsent]=useState(false),[input,setInput]=useState(''),[entries,setEntries]=useState<Entry[]>([]),[pending,setPending]=useState<Proposed|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   useEffect(()=>{void request<{available:boolean}>('/assistant/status').then(v=>setAvailable(v.available)).catch(()=>setAvailable(false));},[]);
-  async function ask(event:FormEvent){event.preventDefault();const message=input.trim();if(!message||busy)return;setInput('');setPending(null);setError('');setEntries(previous=>[...previous,{role:'user',text:message}]);setBusy(true);
+  async function ask(event:FormEvent){event.preventDefault();const message=input.trim();if(!message||busy) { return; }setInput('');setPending(null);setError('');setEntries(previous=>[...previous,{role:'user',text:message}]);setBusy(true);
     try{const history=entries.filter(entry=>entry.role==='user').slice(-4).map(entry=>entry.text);const result=await request<{reply:string;action:Proposed|null}>('/assistant/plan','POST',{message,history});setEntries(previous=>[...previous,{role:'assistant',text:result.reply}]);if(result.action?.type==='navigate'){onNavigate(result.action.page!);setEntries(previous=>[...previous,{role:'assistant',text:'เปิดหน้าที่เกี่ยวข้องแล้ว'}]);}else setPending(result.action);}
     catch(e){setError(e instanceof Error?e.message:'AI ตอบกลับไม่สำเร็จ');}finally{setBusy(false);}
   }
-  async function confirm(){const action=pending;if(!action||busy)return;setBusy(true);setError('');try{
+  async function confirm(){const action=pending;if(!action||busy) { return; }setBusy(true);setError('');try{
     let message='ทำรายการสำเร็จ';
     switch(action.type){
       case 'create_task': await request('/tasks','POST',{...action.data,project_id:action.project_id??null});break;
@@ -31,7 +31,7 @@ export default function AssistantChat({user,draft,onNavigate,onChanged,onUserUpd
       case 'update_project': await request(`/projects/${encodeURIComponent(action.id!)}`,'PATCH',action.data);break;
       case 'delete_project': await request(`/projects/${encodeURIComponent(action.id!)}`,'DELETE');break;
       case 'update_profile':{const result=await request<{user:User}>('/account','PATCH',{name:user.name,nickname:user.nickname??'',phone:user.phone??'',email:user.email,...action.data});onUserUpdated(result.user);break;}
-      case 'update_sk09_draft':{const data={...action.data};if(typeof data.startDate==='string')data.endDate=addFourDays(data.startDate);draft.update(data);await draft.save();break;}
+      case 'update_sk09_draft':{const data={...action.data};if(typeof data.startDate==='string') { data.endDate=addFourDays(data.startDate); }draft.update(data);await draft.save();break;}
       case 'mark_notifications_read':await request('/notifications/read-all','POST');break;
       case 'link_github_issue':await request(`/tasks/${encodeURIComponent(action.id!)}/links`,'POST',{url:action.url});break;
       case 'github_pipeline':{

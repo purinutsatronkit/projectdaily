@@ -50,10 +50,10 @@ export function githubRoutes(db:Database,config:Config) {
     if(response.status===204) return null;
     const reader=response.body?.getReader();if(!reader) return null;
     const chunks:Uint8Array[]=[];let size=0;
-    for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>8*1024*1024){await reader.cancel();throw new ApiError(400,'GITHUB_TOO_LARGE','ข้อมูลชุดนี้มีขนาดใหญ่ กรุณาเปิดดูบน GitHub');}chunks.push(value);}
+    for(;;){const {done,value}=await reader.read();if(done) { break; }size+=value.length;if(size>8*1024*1024){await reader.cancel();throw new ApiError(400,'GITHUB_TOO_LARGE','ข้อมูลชุดนี้มีขนาดใหญ่ กรุณาเปิดดูบน GitHub');}chunks.push(value);}
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   }
-  const parse=<T>(schema:z.ZodType<T>,value:unknown)=>{const result=schema.safeParse(value);if(!result.success)throw new ApiError(400,'INVALID_GITHUB_PARAMETER','พารามิเตอร์ GitHub ไม่ถูกต้อง');return result.data;};
+  const parse=<T>(schema:z.ZodType<T>,value:unknown)=>{const result=schema.safeParse(value);if(!result.success) { throw new ApiError(400,'INVALID_GITHUB_PARAMETER','พารามิเตอร์ GitHub ไม่ถูกต้อง'); }return result.data;};
   const page=(value:string|undefined)=>parse(z.coerce.number().int().min(1).max(1000),value??'1');
   routes.get('/actions',async c=>c.json({actions:await all(db,'SELECT id,repository,action,target,created_at FROM pipeline_actions WHERE user_id=? ORDER BY created_at DESC LIMIT 50',c.get('user').id)}));
   routes.get('/alerts',async c=>{
@@ -90,7 +90,7 @@ export function githubRoutes(db:Database,config:Config) {
   });
   routes.patch('/alerts/:id/read',async c=>{
     const result=await db.prepare('UPDATE pipeline_notifications SET read_at=COALESCE(read_at,?) WHERE id=? AND user_id=?').run(now(),c.req.param('id'),c.get('user').id);
-    if(!result.changes)throw new ApiError(404,'NOT_FOUND','ไม่พบการแจ้งเตือนนี้');return c.body(null,204);
+    if(!result.changes) { throw new ApiError(404,'NOT_FOUND','ไม่พบการแจ้งเตือนนี้'); }return c.body(null,204);
   });
   routes.get('/installations',async c=>c.json(await api(c.get('user').id,`/user/installations?per_page=30&page=${page(c.req.query('page'))}`)));
   routes.get('/installations/:id/repos',async c=>c.json(await api(c.get('user').id,`/user/installations/${parse(numberId,c.req.param('id'))}/repositories?per_page=30&page=${page(c.req.query('page'))}`)));

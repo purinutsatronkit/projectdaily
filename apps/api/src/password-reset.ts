@@ -38,7 +38,7 @@ export function passwordResetRoutes(db: Database, config: Config) {
         const requestId = c.get('requestId');
         // SMTP runs after accepting the request, avoiding account-dependent network response times.
         setImmediate(() => {
-          void mail.send({ to: user.email, resetUrl: link.toString(), expiresMinutes: EXPIRES_MINUTES }).catch(async () => {
+          mail.send({ to: user.email, resetUrl: link.toString(), expiresMinutes: EXPIRES_MINUTES }).catch(async () => {
             await db.prepare('DELETE FROM password_reset_tokens WHERE id=? AND used_at IS NULL').run(id);
             // Do not log SMTP errors: they may contain addresses, credentials, or reset links.
             if (!config.silent) console.error(JSON.stringify({ level: 'error', event: 'password_reset_email_failed', request_id: requestId }));

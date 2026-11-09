@@ -11,7 +11,7 @@ export default function TaskHistory({taskId,projectId}:{taskId?:string;projectId
   const [open,setOpen]=useState(false),[history,setHistory]=useState<Entry[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState('');
   async function load(){
     setLoading(true);setError('');
-    try{const response=await fetch(taskId?`/api/tasks/${taskId}/history`:`/api/shared-projects/${projectId}/activity`,{credentials:'same-origin'});const data=await response.json();if(!response.ok)throw new Error(data?.error?.message??'โหลดประวัติไม่สำเร็จ');setHistory(data.history);}
+    try{const response=await fetch(taskId?`/api/tasks/${taskId}/history`:`/api/shared-projects/${projectId}/activity`,{credentials:'same-origin'});const data=await response.json();if(!response.ok) { throw new Error(data?.error?.message??'โหลดประวัติไม่สำเร็จ'); }setHistory(data.history);}
     catch(e){setError((e as Error).message);}finally{setLoading(false);}
   }
   return <section className="rounded-xl border border-slate-200 bg-white/70 p-3 text-sm">

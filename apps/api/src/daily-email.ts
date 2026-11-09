@@ -38,7 +38,7 @@ export function startDailyReminderScheduler(db:Database,send:(mail:TaskReminderM
       if(result.sent||result.failed)console.log(JSON.stringify({event:'daily_email_reminders',sent:result.sent,failed:result.failed,tasks:result.tasks}));
     }catch{console.error(JSON.stringify({event:'daily_email_reminders_failed'}));}
   }
-  function tick(){if(stopped||running)return;running=run().finally(()=>{running=null;});}
+  function tick(){if(stopped||running) { return; }running=run().finally(()=>{running=null;});}
   tick();const timer=setInterval(tick,60_000);timer.unref();
   return async()=>{stopped=true;clearInterval(timer);await running;};
 }
