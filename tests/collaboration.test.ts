@@ -12,6 +12,18 @@ test('private chat stores messages and files with participant-only access',async
   async function register(name:string,email:string){const r=await app.request('/api/auth/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,email,password:'Demo-pass-42!'})});assert.equal(r.status,201);return {cookie:r.headers.get('set-cookie')!.split(';')[0],id:(await r.json()).user.id};}
   const alice=await register('Alice','alice@example.com'),bob=await register('Bob','bob@example.com'),eve=await register('Eve','eve@example.com');
   const start=await app.request('/api/chat',{method:'POST',headers:{cookie:alice.cookie,'content-type':'application/json'},body:JSON.stringify({email:'bob@example.com'})});assert.equal(start.status,200);const room=(await start.json()).conversation.id;
+  const avatarBytes=Uint8Array.from([137,80,78,71,13,10,26,10,1,2,3]);
+  assert.equal((await app.request('/api/account/avatar',{method:'PUT',headers:{cookie:bob.cookie,'content-type':'image/png'},body:avatarBytes})).status,200);
+  const aliceList=(await (await app.request('/api/chat',{headers:{cookie:alice.cookie}})).json()).conversations;
+  assert.equal(aliceList[0].peer_name,'Bob');
+  assert.match(aliceList[0].peer_avatar_url,new RegExp(`/api/chat/${room}/avatar`));
+  assert.equal((await app.request(`/api/chat/${room}/avatar`,{headers:{cookie:eve.cookie}})).status,404);
+  const peerAvatar=await app.request(`/api/chat/${room}/avatar`,{headers:{cookie:alice.cookie}});
+  assert.equal(peerAvatar.status,200);assert.deepEqual([...new Uint8Array(await peerAvatar.arrayBuffer())],[...avatarBytes]);
+  assert.equal((await app.request(`/api/chat/${room}/nickname`,{method:'PATCH',headers:{cookie:eve.cookie,'content-type':'application/json'},body:JSON.stringify({nickname:'เพื่อน'})})).status,404);
+  assert.equal((await app.request(`/api/chat/${room}/nickname`,{method:'PATCH',headers:{cookie:alice.cookie,'content-type':'application/json'},body:JSON.stringify({nickname:'เพื่อน'})})).status,200);
+  assert.equal((await (await app.request('/api/chat',{headers:{cookie:alice.cookie}})).json()).conversations[0].peer_alias,'เพื่อน');
+  assert.equal((await (await app.request('/api/chat',{headers:{cookie:bob.cookie}})).json()).conversations[0].peer_alias,'');
   assert.equal((await app.request(`/api/chat/${room}/messages`,{headers:{cookie:eve.cookie}})).status,404);
   const form=new FormData();form.set('body','ภาพรายงาน');form.set('file',new File([Uint8Array.from([137,80,78,71,13,10,26,10,1,2,3])],'report.png',{type:'image/png'}));
   const sent=await app.request(`/api/chat/${room}/messages`,{method:'POST',headers:{cookie:alice.cookie},body:form});assert.equal(sent.status,201,await sent.text());

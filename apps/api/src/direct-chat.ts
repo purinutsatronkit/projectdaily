@@ -20,10 +20,12 @@ export function directChatRoutes(db:Database){
   routes.get('/',async c=>{
     const id=c.get('user').id;
     const conversations=await all(db,`SELECT d.id,d.updated_at,u.id peer_id,u.name peer_name,u.nickname peer_nickname,u.email peer_email,
+      CASE WHEN d.user_low=? THEN d.alias_low ELSE d.alias_high END peer_alias,
+      CASE WHEN u.avatar IS NULL THEN NULL ELSE '/api/chat/' || d.id || '/avatar?v=' || u.avatar_version END peer_avatar_url,
       (SELECT body FROM direct_messages WHERE conversation_id=d.id ORDER BY created_at DESC,id DESC LIMIT 1) last_message,
       (SELECT COUNT(*) FROM direct_messages m WHERE m.conversation_id=d.id AND m.sender_id<>? AND m.read_at IS NULL) unread
       FROM direct_conversations d JOIN users u ON u.id=CASE WHEN d.user_low=? THEN d.user_high ELSE d.user_low END
-      WHERE d.user_low=? OR d.user_high=? ORDER BY d.updated_at DESC LIMIT 100`,id,id,id,id);
+      WHERE d.user_low=? OR d.user_high=? ORDER BY d.updated_at DESC LIMIT 100`,id,id,id,id,id);
     return c.json({conversations});
   });
   routes.post('/',async c=>{
@@ -32,11 +34,28 @@ export function directChatRoutes(db:Database){
     const peer=await get<{id:string}>(db,'SELECT id FROM users WHERE email=?',parsed.data.email.trim().toLowerCase());
     if(!peer||peer.id===c.get('user').id)throw new ApiError(404,'RECIPIENT_NOT_FOUND','ไม่พบบัญชีผู้รับ');
     const [low,high]=[peer.id,c.get('user').id].sort();const id=randomUUID(),stamp=now();
-    await db.prepare('INSERT INTO direct_conversations VALUES(?,?,?,?,?) ON CONFLICT(user_low,user_high) DO NOTHING').run(id,low,high,stamp,stamp);
+    await db.prepare('INSERT INTO direct_conversations(id,user_low,user_high,created_at,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_low,user_high) DO NOTHING').run(id,low,high,stamp,stamp);
     const room=(await get<Conversation>(db,'SELECT id,user_low,user_high FROM direct_conversations WHERE user_low=? AND user_high=?',low,high))!;
     return c.json({conversation:room});
   });
   routes.get('/unread',async c=>c.json({count:(await get<{count:number}>(db,`SELECT COUNT(*) count FROM direct_messages m JOIN direct_conversations d ON d.id=m.conversation_id WHERE (d.user_low=? OR d.user_high=?) AND m.sender_id<>? AND m.read_at IS NULL`,c.get('user').id,c.get('user').id,c.get('user').id))!.count}));
+  routes.patch('/:id/nickname',async c=>{
+    const room=await access(c.req.param('id'),c.get('user').id);
+    const parsed=z.object({nickname:z.string().trim().max(40)}).safeParse(await c.req.json().catch(()=>null));
+    if(!parsed.success)throw new ApiError(400,'INVALID_NICKNAME','ชื่อเล่นในแชทยาวได้ไม่เกิน 40 ตัวอักษร');
+    const column=room.user_low===c.get('user').id?'alias_low':'alias_high';
+    await db.prepare(`UPDATE direct_conversations SET ${column}=? WHERE id=?`).run(parsed.data.nickname,room.id);
+    return c.json({nickname:parsed.data.nickname});
+  });
+  routes.get('/:id/avatar',async c=>{
+    const room=await access(c.req.param('id'),c.get('user').id);
+    const peerId=room.user_low===c.get('user').id?room.user_high:room.user_low;
+    const avatar=await get<{avatar:Uint8Array|null;avatar_type:string|null}>(db,'SELECT avatar,avatar_type FROM users WHERE id=?',peerId);
+    if(!avatar?.avatar||!avatar.avatar_type)throw new ApiError(404,'NOT_FOUND','ไม่มีรูปโปรไฟล์');
+    c.header('Content-Type',avatar.avatar_type);c.header('Cache-Control','private, max-age=3600');
+    c.header('X-Content-Type-Options','nosniff');
+    return c.body(new Uint8Array(avatar.avatar).buffer);
+  });
   routes.get('/:id/messages',async c=>{
     const room=await access(c.req.param('id'),c.get('user').id);
     const messages=await all(db,`SELECT m.id,m.sender_id,m.body,m.created_at,m.read_at,a.id attachment_id,a.filename,a.media_type,a.size
