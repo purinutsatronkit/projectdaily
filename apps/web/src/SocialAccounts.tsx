@@ -12,9 +12,18 @@ async function connect(provider:'google'|'github',link=false) {
   window.location.assign(url);
 }
 export function GoogleSignIn() {
-  const [enabled,setEnabled]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  useEffect(()=>{const abort=new AbortController();void socialRequest<{google:boolean}>('/auth/providers',{signal:abort.signal}).then(v=>setEnabled(v.google)).catch(()=>{});return ()=>abort.abort();},[]);
-  if(!enabled) return null;
+  const [status,setStatus]=useState<'loading'|'ready'|'disabled'|'error'>('loading'),[error,setError]=useState(''),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
+  useEffect(()=>{
+    const abort=new AbortController();
+    setStatus('loading');
+    void socialRequest<{google:boolean}>('/auth/providers',{signal:abort.signal})
+      .then(v=>{if(!abort.signal.aborted)setStatus(v.google?'ready':'disabled');})
+      .catch(()=>{if(!abort.signal.aborted)setStatus('error');});
+    return ()=>abort.abort();
+  },[revision]);
+  if(status==='loading') return <p role="status" className="mt-5 text-center text-xs text-slate-500">กำลังตรวจสอบการเข้าสู่ระบบด้วย Google…</p>;
+  if(status==='disabled') return <p role="status" className="mt-5 text-center text-xs leading-6 text-slate-500">การเข้าสู่ระบบด้วย Google ยังไม่พร้อมใช้งาน กรุณาใช้อีเมลและรหัสผ่าน</p>;
+  if(status==='error') return <div role="alert" className="mt-5 text-center text-sm text-red-700">ตรวจสอบการเข้าสู่ระบบด้วย Google ไม่สำเร็จ <button type="button" className="underline" onClick={()=>setRevision(v=>v+1)}>ลองอีกครั้ง</button></div>;
   return <div className="mt-5"><button type="button" className="btn-secondary w-full" disabled={busy} onClick={()=>{setBusy(true);setError('');void connect('google').catch(e=>{setError(e.message);setBusy(false);});}}>{busy?'กำลังเปิด Google…':'เข้าสู่ระบบด้วย Google'}</button>{error&&<p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}</div>;
 }
 type Connections={accounts:{provider:string;login:string}[];google:boolean;github:boolean;install_url:string};

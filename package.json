@@ -17,6 +17,7 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:e2e": "npm run build && playwright test",
     "ai:check": "node --env-file-if-exists=.env --import tsx scripts/check-gemini.ts",
+    "google:check": "node --env-file-if-exists=.env --import tsx scripts/check-google.ts",
     "db:seed": "node --env-file-if-exists=.env --import tsx apps/api/src/seed.ts",
     "start": "node --env-file-if-exists=.env --import tsx apps/api/src/server.ts",
     "setup": "node scripts/setup.mjs",

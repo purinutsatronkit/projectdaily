@@ -59,6 +59,20 @@ test('expired or mismatched OAuth states and disallowed origins cannot exchange 
   assert.equal(f.calls.length,0);
   assert.equal((await f.request('/api/auth/google/start','','POST',{},'https://evil.example')).status,403);
 });
+
+test('concurrent Google callbacks consume state once and issue only one session',async t=>{
+  const f=fixture(t),flow=await f.start();
+  const responses=await Promise.all([f.request(flow.callback,flow.browser),f.request(flow.callback,flow.browser)]);
+  assert.equal(responses.filter(r=>r.headers.get('location')===`${origin}/?oauth=google-login`).length,1);
+  assert.equal(responses.filter(r=>r.headers.get('location')===`${origin}/?oauth_error=failed`).length,1);
+  assert.equal(f.calls.filter(call=>call.url==='https://oauth2.googleapis.com/token').length,1);
+  assert.equal(f.db.prepare('SELECT COUNT(*) count FROM auth_sessions').get()!.count,1);
+  const response=responses.find(r=>r.headers.get('location')===`${origin}/?oauth=google-login`)!;
+  const session=response.headers.get('set-cookie')!.match(/taskflow_session=[^;]+/)![0];
+  const me=await f.request('/api/auth/me',session);
+  assert.equal(me.status,200);
+  assert.equal((await me.json()).user.email,'new@example.com');
+});
 test('matching email requires explicit authenticated Google linking and preserves existing tasks',async t=>{
   const f=fixture(t),owner=await f.register();f.setGoogle({sub:'g-existing',email:owner.user.email,name:'Google Name'});
   const attempt=await f.start();assert.equal((await f.request(attempt.callback,attempt.browser)).headers.get('location'),`${origin}/?oauth_error=link_required`);

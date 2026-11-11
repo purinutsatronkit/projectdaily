@@ -80,9 +80,9 @@ function providerEnabled(social: SocialConfig | undefined, provider: Provider) {
 async function consumeOAuthState(db: Database, config: Config, c: AppContext, provider: Provider) {
   const state=c.req.query('state')??'',browser=getCookie(c,`taskflow_oauth_${provider}`)??'';
   if(!state||!browser) throw new Error('Missing state');
-  const pending=await get<State>(db,'SELECT user_id,session_id,verifier,nonce,browser_hash FROM oauth_states WHERE state_hash=? AND provider=? AND expires_at>?',digest(state),provider,now());
-  if(!pending||pending.browser_hash!==digest(browser)) throw new Error('Invalid state');
-  await db.prepare('DELETE FROM oauth_states WHERE state_hash=?').run(digest(state));
+  // Consume atomically: two callbacks must never exchange the same state/code.
+  const pending=await get<State>(db,'DELETE FROM oauth_states WHERE state_hash=? AND provider=? AND browser_hash=? AND expires_at>? RETURNING user_id,session_id,verifier,nonce,browser_hash',digest(state),provider,digest(browser),now());
+  if(!pending) throw new Error('Invalid state');
   deleteCookie(c,`taskflow_oauth_${provider}`,{path:`/api/auth/${provider}`,secure:!!config.production,sameSite:'Lax'});
   return pending;
 }

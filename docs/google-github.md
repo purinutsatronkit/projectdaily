@@ -4,7 +4,7 @@ TaskFlow เข้าระบบด้วย Google หรืออีเมล
 
 ## เริ่มใช้กับค่าที่ตั้งไว้แล้ว
 
-1. หยุด dev server เดิมด้วย Ctrl+C แล้วรัน `npm.cmd run dev` จาก `D:\project` เปิด `http://localhost:5174` ให้ตรงกับ APP_PUBLIC_URL อย่าสลับเป็น 127.0.0.1 ระหว่าง OAuth
+1. หยุด dev server เดิมด้วย Ctrl+C แล้วรัน `npm.cmd run dev` จากโฟลเดอร์โปรเจกต์ เปิด `http://localhost:5174` ให้ตรงกับ APP_PUBLIC_URL อย่าสลับเป็น 127.0.0.1 ระหว่าง OAuth
 2. ถ้ามีบัญชี TaskFlow และงานเดิมแล้ว ให้เข้าด้วยรหัสผ่านก่อน ไปตั้งค่าบัญชีแล้วกด **เชื่อม Google** ครั้งเดียว หลังจากนั้นเข้าด้วยปุ่ม Google ได้ ระบบไม่รวมบัญชีอัตโนมัติเพียงเพราะอีเมลตรงกัน
 3. ผู้ใช้ใหม่กด **เข้าสู่ระบบด้วย Google** ที่กล่อง login ได้เลย ระบบสร้างบัญชี TaskFlow หลัง Google ยืนยันอีเมล
 4. ในตั้งค่าบัญชี กด **เชื่อม GitHub** แล้วอนุญาตแอป จากนั้นกด **ติดตั้งหรือเลือก repository ที่ GitHub App เข้าถึงได้** และเลือก repository ที่ต้องการ การ authorize ผู้ใช้กับการ install แอปเป็นคนละขั้นตอน ต้องครบทั้งสอง
@@ -33,6 +33,10 @@ OAUTH_TOKEN_KEY=<ค่าสุ่ม 64 ตัวอักษร hex>
 ตรวจค่าที่เซิร์ฟเวอร์อ่านแล้วโดยเปิด `/api/auth/providers` จะได้ boolean เท่านั้น ไม่แสดง secret ค่าขึ้น true หมายถึงตั้งค่าครบ ไม่ได้ยืนยันว่า provider ยอมรับ credential จนกว่าจะทำ OAuth สำเร็จ
 
 ## Google OAuth
+
+หากไม่เห็นปุ่ม Google ให้รัน `npm.cmd run google:check` คำสั่งนี้ตรวจชื่อค่าที่ต้องตั้งและแสดง redirect URI โดยไม่พิมพ์ Client Secret เครื่องที่ยังไม่ได้ตั้ง `GOOGLE_CLIENT_ID` และ `GOOGLE_CLIENT_SECRET` จะปิด Google login และหน้า login แสดงข้อความว่าบริการยังไม่พร้อม การมีค่าครบยังไม่ได้ยืนยันว่า Google ยอมรับค่าเหล่านั้น
+
+ตั้งค่าจริงเฉพาะ `.env` แล้วรีสตาร์ท API (`npm.cmd run dev` ใหม่) ตรวจ `http://localhost:5174/api/auth/providers` ว่า `google` เป็น `true` แล้วปุ่มจึงใช้งานได้ สำหรับเครื่องนี้ใช้ origin `http://localhost:5174` และ redirect URI `http://localhost:5174/api/auth/google/callback` ไม่ส่ง Client Secret ผ่านแชท และไม่ใส่ในตัวแปร `VITE_`
 
 - Google Auth Platform → Clients → Web application
 - Authorized JavaScript origin: `http://localhost:5174`

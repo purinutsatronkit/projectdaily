@@ -3,6 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { resolve } from 'node:path';
 import { openDatabase } from '../apps/api/src/db.ts';
 import { createApp } from '../apps/api/src/app.ts';
+import { randomBytes } from 'node:crypto';
 
 const port = 4179;
 const origin = `http://127.0.0.1:${port}`;
@@ -12,6 +13,20 @@ const app = createApp(db, {
   origins: [origin],
   silent: true,
   authLimit: 100,
+  social: {
+    publicUrl: origin,
+    google: { clientId: 'playwright-google-client', clientSecret: randomBytes(32).toString('base64url') },
+    fetch: (async (url, init) => {
+      if(String(url)!=='https://oauth2.googleapis.com/token'||new URLSearchParams(String(init?.body)).get('code')!=='playwright-google-code') {
+        throw new Error('Unexpected synthetic OAuth request');
+      }
+      return Response.json({access_token:'playwright-access',id_token:'playwright-id-token'});
+    }) as typeof fetch,
+    verifyGoogle: async (token, nonce) => {
+      if(token!=='playwright-id-token'||!nonce) throw new Error('Invalid synthetic Google identity');
+      return {sub:'playwright-google-user',email:'google-browser@example.test',name:'Google Browser User'};
+    },
+  },
   assistant: {
     key: 'playwright-fake-key',
     fetch: (async (_url, init) => {
