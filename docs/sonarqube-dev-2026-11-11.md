@@ -1,5 +1,42 @@
 # Latest DEV report and Google login
 
+## Follow-up: 13:09 report, temporary workspaces still in scan
+
+The subsequent `(2).pdf` report records the 13:09 scan as FAIL, with 0 bugs,
+0 vulnerabilities, 115 code smells, and the same 8 hotspots under the two
+temporary document workspaces. The supplied gate screenshot identifies Security
+Hotspot grade E as the failing condition; the other displayed ratings pass.
+The PDF's headline pass count conflicts with its scan-history rows, so the
+headline alone must not be used to claim the gate passes.
+
+Exclusions alone did not remove these findings from the supplied report. This
+does not establish whether the runner ignored configuration or the report kept
+older findings. To correct repository contents, removed 588 generated/vendored
+files under `tmp/video-presentation/` and `tmp/video-report-doc/` from Git's index
+and ignored those exact directories. All 588 files remain in their original local
+paths, with content hashes verified unchanged against HEAD. Final documents
+under `output/` and `presentation/output/` remain tracked.
+
+These removals are staged for review; they are not a deletion of local files.
+They take effect in a remote checkout after committing and pushing the changes.
+If scanning the local folder directly, the scanner must honor `.gitignore` and
+the checked-in SonarQube source/exclusion settings. No report-library code or
+OpenXML namespace was altered merely to hide a hotspot.
+
+The source ZIP builder now includes `sonar-project.properties`,
+`tsconfig.sonar.json`, and all configured source/test directories. Previously the
+archive omitted the scanner configuration and some of those directories. The
+builder excludes the temporary workspaces and local environment files, and
+checks the ZIP's integrity and scan inputs. Run `python scripts/package-source.py`
+to create `artifacts/taskflow-project.zip`; when scanning it, use the extracted
+`taskflow` directory as the project root.
+
+No authenticated SonarQube scan was run. The 115 code smells remain unenumerated
+in the PDF; a new per-issue export is needed to identify them. Security Hotspot
+grade E must be verified again on a fresh scan, not inferred from local cleanup.
+
+## Previous changes
+
 Branch checked before editing: `dev`, clean working tree at `36d871e`.
 Source report: `Report_projectdaily_DEV_2026-11-11_to_2026-11-11.pdf`, scan at
 11:27 on 2026-11-11. The report records a passing quality gate with 1 bug,

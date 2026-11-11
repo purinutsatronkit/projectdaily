@@ -9,3 +9,8 @@ artifacts/
 playwright-report/
 test-results/
 .DS_Store
+
+# Local document-generation workspaces and their vendored dependencies.
+# Final deliverables remain under output/ and presentation/output/.
+/tmp/video-presentation/
+/tmp/video-report-doc/
