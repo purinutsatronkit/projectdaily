@@ -1,5 +1,6 @@
 import { createApp } from '../apps/api/src/app.ts';
 import { openDatabase } from '../apps/api/src/db.ts';
+import { randomBytes } from 'node:crypto';
 
 const key=process.env.GEMINI_API_KEY?.trim();
 const model=process.env.GEMINI_MODEL?.trim()||'gemini-3.5-flash-lite';
@@ -16,8 +17,8 @@ else{
       const db=openDatabase(':memory:');
       try{
         const origin='http://localhost:5174';
-        const app=createApp(db,{secret:'synthetic-assistant-check-secret-2026',origins:[origin],silent:true,assistant:{key,model}});
-        const registered=await app.request('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AI Check',email:'ai-check@example.test',password:'Test!2026'})});
+        const app=createApp(db,{secret:randomBytes(48).toString('base64url'),origins:[origin],silent:true,assistant:{key,model}});
+        const registered=await app.request('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'AI Check',email:'ai-check@example.test',password:randomBytes(12).toString('base64url')})});
         const cookie=registered.headers.get('set-cookie')?.split(';')[0]??'';
         const planned=await app.request('/api/assistant/plan',{method:'POST',headers:{'Content-Type':'application/json',origin,cookie},body:JSON.stringify({message:'เพิ่มงานชื่อ ทดสอบ AI วันที่ 7 มกราคมปีหน้า'})});
         const result=await planned.json() as {action?:{type?:string};error?:{code?:string}};

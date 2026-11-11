@@ -129,13 +129,13 @@ function AuthModal({ mode, setMode, onClose, onLogin, notice }: { mode: AuthMode
   const [loading, setLoading] = useState(false); const [error, setError] = useState('');
   const registration = mode === 'register';
   if (mode === 'forgot') return <ForgotPasswordModal initialEmail={email} onClose={onClose} onBack={() => { setMode('login'); setPassword(''); setError(''); }} />;
-  async function submit(event?: SubmitEvent, demo = false) {
-    event?.preventDefault(); setError('');
-    const payload = demo ? { email: 'demo@taskflow.local', password: 'TaskFlow!2026' } : { email, password, ...(registration ? { name } : {}) };
-    const parsed = (registration && !demo ? registerSchema : loginSchema).safeParse(payload);
+  async function submit(event: SubmitEvent) {
+    event.preventDefault(); setError('');
+    const payload = { email, password, ...(registration ? { name } : {}) };
+    const parsed = (registration ? registerSchema : loginSchema).safeParse(payload);
     if (!parsed.success) { setError(registration ? 'กรอกชื่ออย่างน้อย 2 ตัวอักษร อีเมลที่ถูกต้อง และรหัสผ่าน8–16 ตัวอักษร' : 'กรอกอีเมลที่ถูกต้องและรหัสผ่าน'); return; }
     setLoading(true);
-    try { const result = await api<{ user: User }>(`/auth/${registration && !demo ? 'register' : 'login'}`, { method: 'POST', body: JSON.stringify(parsed.data) }); onLogin(result.user); }
+    try { const result = await api<{ user: User }>(`/auth/${registration ? 'register' : 'login'}`, { method: 'POST', body: JSON.stringify(parsed.data) }); onLogin(result.user); }
     catch (err) { setError(errorText(err)); } finally { setLoading(false); }
   }
   return <Modal title={registration ? 'เริ่มพื้นที่ทำงานของคุณ' : 'ยินดีต้อนรับกลับมา'} subtitle={registration ? 'สร้างบัญชีเพื่อเก็บงานและติดตามความก้าวหน้า' : 'เข้ามาจัดลำดับงาน แล้วเริ่มวันอย่างชัดเจน'} onClose={() => { if (!loading) onClose(); }}>{notice && mode === 'login' && <p role="status" className="mt-5 rounded-xl border border-teal-100 bg-teal-50 p-4 text-sm leading-7 text-teal-800">{notice}</p>}<form className="mt-7 space-y-4" onSubmit={submit}>
@@ -145,7 +145,7 @@ function AuthModal({ mode, setMode, onClose, onLogin, notice }: { mode: AuthMode
     {!registration && <div className="flex justify-end"><button type="button" disabled={loading} onClick={() => { setMode('forgot'); setPassword(''); setError(''); }} className="min-h-10 text-xs font-semibold text-teal-700 hover:underline">ลืมรหัสผ่าน?</button></div>}
     {error && <ErrorBox message={error} />}
     <button className="btn-primary w-full !py-3" disabled={loading}>{loading ? <Spinner small /> : <>{registration ? 'สร้างบัญชี' : 'เข้าสู่ระบบ'}<ArrowRight size={17} /></>}</button>
-  </form><GoogleSignIn/>{!registration && import.meta.env.DEV && <><div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />หรือทดลองใช้งาน<span className="h-px flex-1 bg-slate-200" /></div><button disabled={loading} className="btn-secondary w-full" onClick={() => void submit(undefined, true)}><Sparkles size={16} />เข้าสู่บัญชีตัวอย่าง</button><p className="mt-2 text-center text-xs leading-5 text-slate-400">บัญชีตัวอย่างเป็นพื้นที่ร่วมกัน ข้อมูลอาจถูกแก้ไขได้</p></>}
+  </form><GoogleSignIn/>{!registration && import.meta.env.DEV && <><div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />หรือทดลองใช้งาน<span className="h-px flex-1 bg-slate-200" /></div><button disabled={loading} className="btn-secondary w-full" onClick={() => { setEmail('demo@taskflow.local'); setPassword(''); setError(''); }}><Sparkles size={16} />ใช้อีเมลบัญชีตัวอย่าง</button><p className="mt-2 text-center text-xs leading-5 text-slate-400">กรอกรหัสผ่านที่ตั้งไว้ตอนสร้างข้อมูลตัวอย่าง บัญชีนี้เป็นพื้นที่ร่วมกัน</p></>}
     <p className="mt-6 text-center text-sm text-slate-500">{registration ? 'มีบัญชีอยู่แล้ว?' : 'ยังไม่มีบัญชี?'} <button disabled={loading} onClick={() => { setMode(registration ? 'login' : 'register'); setError(''); }} className="font-semibold text-teal-700 hover:underline">{registration ? 'เข้าสู่ระบบ' : 'สร้างบัญชี'}</button></p>
   </Modal>;
 }

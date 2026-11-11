@@ -8,6 +8,6 @@
   "dependencies": {
     "@libsql/client": "^0.18.0",
     "@taskflow/shared": "*",
-    "nodemailer": "^10.1.1"
+    "nodemailer": "^10.5.0"
   }
 }

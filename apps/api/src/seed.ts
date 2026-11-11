@@ -4,12 +4,15 @@ import { resolve } from 'node:path';
 import { openDatabase } from './db.ts';
 import { hashPassword } from './security.ts';
 import { bangkokDate, now, transaction } from './context.ts';
+import { registerSchema } from '@taskflow/shared';
 const root = fileURLToPath(new URL('../../../',import.meta.url));
 if (process.env.NODE_ENV === 'production') throw new Error('Demo seed is disabled in production.');
+const credentials = registerSchema.safeParse({ name: 'นที', email: 'demo@taskflow.local', password: process.env.DEMO_PASSWORD });
+if (!credentials.success) throw new Error('Set DEMO_PASSWORD in .env to a password of 8–16 characters before seeding.');
 const db = openDatabase(resolve(root,process.env.DATABASE_PATH ?? './data/taskflow.sqlite'));
 const email = 'demo@taskflow.local';
 if (!await db.prepare('SELECT id FROM users WHERE email=?').get(email)) {
-  const userId = randomUUID(), hash = await hashPassword('TaskFlow!2026');
+  const userId = randomUUID(), hash = await hashPassword(credentials.data.password);
   const today = bangkokDate();
   const shiftDate = (days: number) => { const date = new Date(today+'T00:00:00Z'); date.setUTCDate(date.getUTCDate()+days); return date.toISOString().slice(0,10); };
   await transaction(db,async () => {
@@ -23,6 +26,6 @@ if (!await db.prepare('SELECT id FROM users WHERE email=?').get(email)) {
     ];
     for (const [title,description,priority,status,date] of tasks) await db.prepare('INSERT INTO tasks(id,user_id,title,description,priority,status,due_date,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').run(randomUUID(),userId,title,description,priority,status,date,now(),now());
   });
-  console.log('Demo account created: demo@taskflow.local / TaskFlow!2026 (local learning only).');
+  console.log('Demo account created: demo@taskflow.local (local learning only). Sign in with the DEMO_PASSWORD you configured.');
 } else console.log('Demo account already exists; kept all existing data.');
 db.close();

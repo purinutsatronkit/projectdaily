@@ -11,6 +11,7 @@
 ```powershell
 npm.cmd install
 npm.cmd run setup
+# Set DEMO_PASSWORD in .env to your own password of 8–16 characters before seeding.
 npm.cmd run db:seed
 npm.cmd run dev
 ```
@@ -18,7 +19,8 @@ npm.cmd run dev
 เปิด **http://localhost:5174** สำหรับเว็บ และ **http://localhost:3001/api/health** สำหรับตรวจ API
 
 - บัญชีเดโม: `demo@taskflow.local`
-- รหัสผ่านเดโม: `TaskFlow!2026`
+- รหัสผ่านเดโม: ตั้ง `DEMO_PASSWORD` ใน `.env` เองก่อนรัน `db:seed` แล้วกรอกรหัสนี้ตอนเข้าสู่ระบบ (ไม่ฝังในเว็บและไม่แสดงใน log)
+- หากเคย seed ด้วยรหัสเดิม ให้เปลี่ยนรหัสผ่านผ่านหน้าตั้งค่าบัญชี การ seed ซ้ำจะไม่เปลี่ยนรหัสของบัญชีที่มีอยู่
 - สมัครบัญชีใหม่ได้ รหัสผ่าน8–16 ตัวอักษร
 - `npm run setup` สร้าง `.env` และ JWT secret แบบสุ่มครั้งแรก โดยไม่ทับไฟล์เดิม
 - `npm run db:seed` สร้างข้อมูลตัวอย่างครั้งแรก โดยไม่ลบงานเดิม
